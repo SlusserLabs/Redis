@@ -89,8 +89,12 @@ namespace SlusserLabs.Redis.Resp
         public bool Read(ReadOnlyMemory<byte> input, bool isFinalBlock = false)
         {
             var result = false;
+
+            // TODO incorporate isFinalBlock?
             if (input.Length == 0)
                 return result;
+
+            // TODO Drop memory that is no longer part of the sequence.
 
             // Did we return a complete token in the last operation? Reset state for the next run
             if (_tokenType == RespTokenType.None)
