@@ -12,7 +12,7 @@ namespace SlusserLabs.Redis.Resp
     /// <summary>
     /// Defines the various RESP tokens that make up a RESP data.
     /// </summary>
-    public enum RespTokenType : byte
+    public enum RespTokenType
     {
         /// <summary>
         /// There is no value (as distinct from <see cref="NullBulkString" /> or <see cref="NullArray" />).
@@ -22,6 +22,11 @@ namespace SlusserLabs.Redis.Resp
         /// <summary>
         /// The token is a RESP Simple String.
         /// </summary>
-        SimpleString
+        SimpleString,
+
+        /// <summary>
+        /// The token is a RESP Error.
+        /// </summary>
+        Error
     }
 }

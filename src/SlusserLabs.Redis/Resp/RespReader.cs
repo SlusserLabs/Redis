@@ -17,8 +17,9 @@ namespace SlusserLabs.Redis.Resp
     {
         private RespReaderOptions _options;
 
-        private MemorySegment? _firstSegment;
-        private MemorySegment? _currentSegment;
+        private ReadOnlyMemorySequenceSegment<byte>? _firstSegment;
+        private ReadOnlyMemorySequenceSegment<byte>? _currentSegment;
+
         private RespLexemeType _lexemeType;
         private RespTokenType _tokenType;
 
@@ -27,6 +28,9 @@ namespace SlusserLabs.Redis.Resp
         private int _valueStartIndex; // Where the token value begins (excluding control byte) within the memory
         private int _runningValueLength; // The token value length (excluding control bytes)
 
+        private ReadOnlySequence<byte> _valueSequence;
+        private ReadOnlySequence<byte> _tokenSequence;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="RespReader" /> class.
         /// </summary>
@@ -34,6 +38,9 @@ namespace SlusserLabs.Redis.Resp
         public RespReader(RespReaderOptions options = default)
         {
             _options = options;
+
+            _valueSequence = ReadOnlySequence<byte>.Empty;
+            _tokenSequence = ReadOnlySequence<byte>.Empty;
         }
 
         /// <summary>
@@ -49,31 +56,36 @@ namespace SlusserLabs.Redis.Resp
         /// <summary>
         /// Gets the entire byte sequence of the processed <see cref="TokenType" />, including any control bytes.
         /// </summary>
-        public ReadOnlySequence<byte> TokenSequence
-        {
-            get
-            {
-                return new ReadOnlySequence<byte>(_firstSegment!, _tokenStartIndex, _currentSegment!, _bytesConsumed);
-            }
-        }
+        public ReadOnlySequence<byte> TokenSequence => _tokenSequence;
 
         /// <summary>
         /// Gets the byte sequence of the processed <see cref="TokenType" />, excluding any control bytes.
         /// </summary>
-        public ReadOnlySequence<byte> ValueSequence
+        public ReadOnlySequence<byte> ValueSequence => _valueSequence;
+
+        /// <summary>
+        /// Resets the internal state of this instance so it can be reused.
+        /// </summary>
+        public void Reset()
         {
-            get
-            {
-                return new ReadOnlySequence<byte>(_firstSegment!, _valueStartIndex, _currentSegment!, _runningValueLength + _valueStartIndex);
-            }
+            _bytesConsumed = 0;
+            _tokenStartIndex = 0;
+            _valueStartIndex = 0;
+            _runningValueLength = 0;
+
+            _lexemeType = RespLexemeType.None;
+            _tokenType = RespTokenType.None;
+
+            _valueSequence = ReadOnlySequence<byte>.Empty;
+            _tokenSequence = ReadOnlySequence<byte>.Empty;
         }
 
-    /// <summary>
-    /// Reads the next RESP token from the input.
-    /// </summary>
-    /// <param name="input">The byte data to read from.</param>
-    /// <param name="isFinalBlock">Indicates whether <paramref name="input" /> is the last of the input to process.</param>
-    /// <returns><c>true</c> if a token was read successfully; otherwise, <c>false</c>.</returns>
+        /// <summary>
+        /// Reads the next RESP token from the input.
+        /// </summary>
+        /// <param name="input">The byte data to read from.</param>
+        /// <param name="isFinalBlock">Indicates whether <paramref name="input" /> is the last of the input to process.</param>
+        /// <returns><c>true</c> if a token was read successfully; otherwise, <c>false</c>.</returns>
         public bool Read(ReadOnlyMemory<byte> input, bool isFinalBlock = false)
         {
             var result = false;
@@ -84,7 +96,7 @@ namespace SlusserLabs.Redis.Resp
             if (_tokenType == RespTokenType.None)
             {
                 // Start a new memory chain
-                _firstSegment = new MemorySegment(input);
+                _firstSegment = new ReadOnlyMemorySequenceSegment<byte>(input);
                 _currentSegment = _firstSegment;
                 _lexemeType = RespLexemeType.None;
                 _bytesConsumed = 0;
@@ -95,7 +107,7 @@ namespace SlusserLabs.Redis.Resp
             else
             {
                 // Append memory to existing chain
-                _currentSegment = _currentSegment!.Link(new MemorySegment(input));
+                _currentSegment = _currentSegment!.Append(input);
             }
 
             var span = input.Span;
@@ -119,6 +131,15 @@ namespace SlusserLabs.Redis.Resp
                                 _bytesConsumed++;
                                 pos++;
                                 break;
+
+                            case RespConstants.Minus:
+                                _lexemeType = RespLexemeType.ErrorStart;
+                                _tokenType = RespTokenType.Error;
+                                _tokenStartIndex = _bytesConsumed;
+                                _bytesConsumed++;
+                                pos++;
+                                break;
+
                             default:
                                 throw new InvalidOperationException("Unrecognized RESP control byte.");
                         }
@@ -126,7 +147,7 @@ namespace SlusserLabs.Redis.Resp
                         break;
 
                     case RespLexemeType.SimpleStringStart:
-                        // The first byte of a Simple String value
+                        // Anything following a '+' control byte
                         _lexemeType = RespLexemeType.SimpleString;
                         _valueStartIndex = _bytesConsumed;
                         goto REPROCESS;
@@ -153,6 +174,12 @@ namespace SlusserLabs.Redis.Resp
                         }
 
                         break;
+
+                    case RespLexemeType.ErrorStart:
+                        // Anything following a '-' control byte
+                        _lexemeType = RespLexemeType.Error;
+                        _valueStartIndex = _bytesConsumed;
+                        goto REPROCESS;
 
                     case RespLexemeType.CarriageReturn:
                         // Should only be followed by a LF
