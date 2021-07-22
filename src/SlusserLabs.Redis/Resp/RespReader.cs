@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
@@ -119,6 +122,7 @@ namespace SlusserLabs.Redis.Resp
                             default:
                                 throw new InvalidOperationException("Unrecognized RESP control byte.");
                         }
+
                         break;
 
                     case RespLexemeType.SimpleStringStart:
@@ -147,6 +151,7 @@ namespace SlusserLabs.Redis.Resp
                                 pos++;
                                 break;
                         }
+
                         break;
 
                     case RespLexemeType.CarriageReturn:
@@ -163,12 +168,13 @@ namespace SlusserLabs.Redis.Resp
                                 // TODO Throw
                                 break;
                         }
+
                         break;
 
-                    //case RespLexemeType.LineFeed:
-                    //    _lexemeType = RespLexemeType.None;
-                    //    result = true;
-                    //    goto DONE;
+                    // case RespLexemeType.LineFeed:
+                    //     _lexemeType = RespLexemeType.None;
+                    //     result = true;
+                    //     goto DONE;
                 }
             }
 

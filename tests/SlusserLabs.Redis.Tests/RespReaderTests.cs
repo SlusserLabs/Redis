@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -17,8 +20,8 @@ namespace SlusserLabs.Redis.Resp.Tests
             var reader = new RespReader();
 
             Assert.Equal(RespTokenType.None, reader.TokenType);
-            //Assert.Equal(0, reader.TokenSequence.Length);
-            //Assert.Equal(0, reader.ValueSequence.Length);
+            // Assert.Equal(0, reader.TokenSequence.Length);
+            // Assert.Equal(0, reader.ValueSequence.Length);
         }
 
         [Theory]

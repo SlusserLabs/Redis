@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,10 +20,11 @@ namespace SlusserLabs.Redis.Resp
         public const byte CarriageReturn = (byte)'\r';
         public const byte LineFeed = (byte)'\n';
 
-        public static ReadOnlySpan<byte> CarriageReturnLineFeed => new byte[] { (byte)'\r', (byte)'\n' };
-        public static ReadOnlySpan<byte> NullBulkString => new byte[] { (byte)'$', (byte)'-', (byte)'1', (byte)'\r', (byte)'\n' };
-
         // 512 MBs comes from the documentation https://redis.io/topics/protocol#resp-bulk-strings
         public const int MaxBulkStringLength = 512 * 1024 * 1024;
+
+        public static ReadOnlySpan<byte> CarriageReturnLineFeed => new byte[] { (byte)'\r', (byte)'\n' };
+
+        public static ReadOnlySpan<byte> NullBulkString => new byte[] { (byte)'$', (byte)'-', (byte)'1', (byte)'\r', (byte)'\n' };
     }
 }

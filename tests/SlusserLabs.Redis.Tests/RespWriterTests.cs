@@ -1,3 +1,6 @@
+﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -36,7 +39,6 @@ namespace SlusserLabs.Redis.Resp.Tests
             Assert.Throws<ArgumentException>(() => new RespWriter(stream));
             Assert.Throws<ArgumentException>(() => new RespWriter(stream, options));
         }
-
 
         [Theory]
         [InlineData(true)]
@@ -101,20 +103,18 @@ namespace SlusserLabs.Redis.Resp.Tests
             Assert.Equal(expectedBytes, bufferWriter.WrittenSpan.ToArray());
         }
 
-
-
-        //public static IEnumerable<object[]> RespEncodedBulkStrings
-        //{
-        //    get
-        //    {
-        //        return new List<object[]>
-        //        {
-        //            new object[] { "", "$0\r\n\r\n" },
-        //            new object[] { "foobar", "$6\r\nfoobar\r\n" },
-        //            new object[] { "hello, \"world\"", "\"mess\\u0022age\"" },
-        //        };
-        //    }
-        //}
+        // public static IEnumerable<object[]> RespEncodedBulkStrings
+        // {
+        //     get
+        //     {
+        //         return new List<object[]>
+        //         {
+        //             new object[] { "", "$0\r\n\r\n" },
+        //             new object[] { "foobar", "$6\r\nfoobar\r\n" },
+        //             new object[] { "hello, \"world\"", "\"mess\\u0022age\"" },
+        //         };
+        //     }
+        // }
 
         private static void WriteManyBulkStrings(RespWriter writer, int length)
         {
