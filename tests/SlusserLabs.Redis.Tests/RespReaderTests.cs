@@ -61,7 +61,7 @@ namespace SlusserLabs.Redis.Resp.Tests
                 reader.ValueSequence.Length.ShouldBe(1);
                 reader.ValueSequence.ToArray().ShouldBe(expectedBytes[i]);
 
-                memory = memory.Slice((int)reader.TokenSequence.Length);
+                memory = memory.Slice(reader.TokenLength);
             }
 
             //reader.Read(Memory<byte>.Empty, true).ShouldBeTrue();

@@ -17,15 +17,16 @@ namespace SlusserLabs.Redis.Resp
     {
         private RespReaderOptions _options;
 
-        private ReadOnlyMemorySequenceSegment<byte>? _firstSegment;
-        private ReadOnlyMemorySequenceSegment<byte>? _currentSegment;
-
         private long _bytesConsumed;
 
+        private int _valueStart;
         private int _tokenLength;
         private bool _tokenComplete;
         private RespTokenType _tokenType;
         private RespLexemeType _lexemeType;
+
+        private ReadOnlyMemorySequenceSegment<byte>? _firstSegment;
+        private ReadOnlyMemorySequenceSegment<byte>? _currentSegment;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RespReader" /> class.
@@ -46,6 +47,20 @@ namespace SlusserLabs.Redis.Resp
         /// </summary>
         /// <remarks>Calling <see cref="Reset" /> will zero this value.</remarks>
         public long BytesConsumed => _bytesConsumed;
+
+        /// <summary>
+        /// Gets the number of bytes in the current token.
+        /// </summary>
+        public int TokenLength
+        {
+            get
+            {
+                if (_tokenComplete == false)
+                    return 0;
+
+                return _tokenLength;
+            }
+        }
 
         /// <summary>
         /// Gets the type of the last processed RESP token.
@@ -117,9 +132,9 @@ namespace SlusserLabs.Redis.Resp
             if (input.Length == 0)
                 goto DONE;
 
-            if (_tokenType == RespTokenType.None || _tokenComplete)
+            if (_tokenComplete || _tokenType == RespTokenType.None)
             {
-                // Setup for a new token
+                // Setup for a new (or first) token
                 _tokenLength = 0;
                 _tokenComplete = false;
                 _tokenType = RespTokenType.None;
@@ -136,32 +151,53 @@ namespace SlusserLabs.Redis.Resp
 
             var pos = 0;
             var span = input.Span;
+
+            switch (_tokenType)
+            {
+                case RespTokenType.SimpleString:
+                    ConsumeSimpleString(span, ref pos);
+                    break;
+
+                default:
+                    ConsumeControlByte(span, ref pos);
+                    break;
+            }
+
+        DONE:
+            return _tokenComplete;
+        }
+
+        private bool ConsumeControlByte(ReadOnlySpan<byte> span, ref int pos)
+        {
             while (pos < span.Length)
             {
                 var b = span[pos];
+                switch (b)
+                {
+                    case RespConstants.Plus:
+                        _lexemeType = RespLexemeType.SimpleString;
+                        _tokenType = RespTokenType.SimpleString;
+                        _bytesConsumed++;
+                        _valueStart++;
+                        _tokenLength++;
+                        pos++;
+                        return ConsumeSimpleString(span, ref pos);
 
-            REPROCESS:
+                    default:
+                        throw new RespException(); // TODO Not a control byte
+                }
+            }
+
+            return false;
+        }
+
+        private bool ConsumeSimpleString(ReadOnlySpan<byte> span, ref int pos)
+        {
+            while (pos < span.Length)
+            {
+                var b = span[pos];
                 switch (_lexemeType)
                 {
-                    case RespLexemeType.None:
-                        // The start of a new lexeme/token should always be a control byte
-                        switch (b)
-                        {
-                            case RespConstants.Plus:
-                                _lexemeType = RespLexemeType.SimpleString;
-                                _tokenType = RespTokenType.SimpleString;
-                                _bytesConsumed++;
-                                _tokenLength++;
-                                pos++;
-                                break;
-                        }
-
-                        break;
-
-                    case RespLexemeType.SimpleString:
-                        _lexemeType = RespLexemeType.SimpleStringValue;
-                        goto REPROCESS;
-
                     case RespLexemeType.SimpleStringValue:
                         // Look for CR (or illegal characters)
                         switch (b)
@@ -190,21 +226,14 @@ namespace SlusserLabs.Redis.Resp
                                 _lexemeType = RespLexemeType.LineFeed;
                                 _bytesConsumed++;
                                 _tokenLength++;
-                                _tokenComplete = true;
-                                goto DONE;
+                                return true;
                         }
 
                         break;
                 }
             }
 
-        DONE:
-            if (isFinalBlock)
-            {
-                // Ensure we've reached a terminal state
-            }
-
-            return _tokenComplete;
+            return false;
         }
     }
 }

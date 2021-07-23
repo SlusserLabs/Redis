@@ -27,6 +27,11 @@ namespace SlusserLabs.Redis.Resp
         /// <summary>
         /// The token is a RESP Error.
         /// </summary>
-        Error
+        Error,
+
+        /// <summary>
+        /// The token is a RESP Bulk String.
+        /// </summary>
+        BulkString
     }
 }

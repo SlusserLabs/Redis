@@ -16,7 +16,9 @@ namespace SlusserLabs.Redis.Resp
         public const byte Plus = (byte)'+';
         public const byte Colon = (byte)':';
         public const byte Asterisk = (byte)'*';
+        public const byte Zero = (byte)'0';
         public const byte One = (byte)'1';
+        public const byte Nine = (byte)'9';
         public const byte CarriageReturn = (byte)'\r';
         public const byte LineFeed = (byte)'\n';
 

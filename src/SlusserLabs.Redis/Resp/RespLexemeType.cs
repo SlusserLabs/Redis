@@ -16,8 +16,10 @@ namespace SlusserLabs.Redis.Resp
         LineFeed,
         SimpleString,
         SimpleStringValue,
-        // SimpleString,
-        ErrorStart,
-        Error
+        Error,
+        ErrorValue,
+        BulkString,
+        BulkStringLength,
+        BulkStringValue
     }
 }
