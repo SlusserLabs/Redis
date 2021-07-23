@@ -21,13 +21,11 @@ namespace SlusserLabs.Redis.Resp
         private ReadOnlyMemorySequenceSegment<byte>? _currentSegment;
 
         private long _bytesConsumed;
-        private int _tokenEndPosition;
+
+        private int _tokenLength;
+        private bool _tokenComplete;
         private RespTokenType _tokenType;
         private RespLexemeType _lexemeType;
-        private bool _tokenComplete;
-
-        private ReadOnlySequence<byte> _tokenSequence;
-        private ReadOnlySequence<byte> _valueSequence;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RespReader" /> class.
@@ -36,9 +34,6 @@ namespace SlusserLabs.Redis.Resp
         public RespReader(RespReaderOptions options = default)
         {
             _options = options;
-
-            _valueSequence = ReadOnlySequence<byte>.Empty;
-            _tokenSequence = ReadOnlySequence<byte>.Empty;
         }
 
         /// <summary>
@@ -55,24 +50,60 @@ namespace SlusserLabs.Redis.Resp
         /// <summary>
         /// Gets the type of the last processed RESP token.
         /// </summary>
-        public RespTokenType TokenType => _tokenComplete ? _tokenType : RespTokenType.None;
+        public RespTokenType TokenType
+        {
+            get
+            {
+                if (_tokenComplete == false)
+                    return RespTokenType.None;
+
+                return _tokenType;
+            }
+        }
 
         /// <summary>
         /// Gets the entire byte sequence of the processed <see cref="TokenType" />, including any control bytes.
         /// </summary>
-        public ReadOnlySequence<byte> TokenSequence => _tokenSequence;
+        public ReadOnlySequence<byte> TokenSequence
+        {
+            get
+            {
+                if (_tokenComplete == false)
+                    return ReadOnlySequence<byte>.Empty;
+
+                return new ReadOnlySequence<byte>(_firstSegment!, 0, _currentSegment!, _tokenLength);
+            }
+        }
 
         /// <summary>
         /// Gets the byte sequence of the processed <see cref="TokenType" />, excluding any control bytes.
         /// </summary>
-        public ReadOnlySequence<byte> ValueSequence => _valueSequence;
+        public ReadOnlySequence<byte> ValueSequence
+        {
+            get
+            {
+                if (_tokenComplete == false)
+                    return ReadOnlySequence<byte>.Empty;
+
+                // Same as token sequence without control bytes
+                return new ReadOnlySequence<byte>(_firstSegment!, 1, _currentSegment!, _tokenLength - 2);
+            }
+        }
 
         /// <summary>
         /// Resets the internal state of this instance so it can be reused.
         /// </summary>
         public void Reset()
         {
-            ResetImpl(true);
+            _bytesConsumed = 0;
+
+            _tokenLength = 0;
+            _tokenComplete = false;
+            _tokenType = RespTokenType.None;
+            _lexemeType = RespLexemeType.None;
+
+            _firstSegment = null;
+            _currentSegment = null;
         }
 
         /// <summary>
@@ -86,19 +117,22 @@ namespace SlusserLabs.Redis.Resp
             if (input.Length == 0)
                 goto DONE;
 
-            if (_tokenComplete)
+            if (_tokenType == RespTokenType.None || _tokenComplete)
             {
                 // Setup for a new token
-                _tokenEndPosition = 0;
+                _tokenLength = 0;
+                _tokenComplete = false;
                 _tokenType = RespTokenType.None;
                 _lexemeType = RespLexemeType.None;
 
-                _valueSequence = ReadOnlySequence<byte>.Empty;
-                _tokenSequence = ReadOnlySequence<byte>.Empty;
+                _firstSegment = new ReadOnlyMemorySequenceSegment<byte>(input);
+                _currentSegment = _firstSegment;
             }
-
-            _firstSegment = new ReadOnlyMemorySequenceSegment<byte>(input);
-            _currentSegment = _firstSegment;
+            else
+            {
+                // Continue processing the current token
+                _currentSegment = _currentSegment!.Append(input);
+            }
 
             var pos = 0;
             var span = input.Span;
@@ -117,7 +151,7 @@ namespace SlusserLabs.Redis.Resp
                                 _lexemeType = RespLexemeType.SimpleString;
                                 _tokenType = RespTokenType.SimpleString;
                                 _bytesConsumed++;
-                                _tokenEndPosition++;
+                                _tokenLength++;
                                 pos++;
                                 break;
                         }
@@ -135,13 +169,13 @@ namespace SlusserLabs.Redis.Resp
                             case RespConstants.CarriageReturn:
                                 _lexemeType = RespLexemeType.CarriageReturn;
                                 _bytesConsumed++;
-                                _tokenEndPosition++;
+                                _tokenLength++;
                                 pos++;
                                 break;
 
                             default:
                                 _bytesConsumed++;
-                                _tokenEndPosition++;
+                                _tokenLength++;
                                 pos++;
                                 break;
                         }
@@ -155,7 +189,7 @@ namespace SlusserLabs.Redis.Resp
                             case RespConstants.LineFeed:
                                 _lexemeType = RespLexemeType.LineFeed;
                                 _bytesConsumed++;
-                                _tokenEndPosition++;
+                                _tokenLength++;
                                 _tokenComplete = true;
                                 goto DONE;
                         }
@@ -170,30 +204,7 @@ namespace SlusserLabs.Redis.Resp
                 // Ensure we've reached a terminal state
             }
 
-            if (_tokenComplete)
-            {
-                _tokenSequence = new ReadOnlySequence<byte>(_firstSegment!, 0, _currentSegment!, _tokenEndPosition);
-                _valueSequence = new ReadOnlySequence<byte>(_firstSegment!, 1, _currentSegment!, _tokenEndPosition - 2);
-            }
-
             return _tokenComplete;
-        }
-
-        private void ResetImpl(bool includeBytesConsumed)
-        {
-            //_bytesConsumed = 0;
-            //_tokenStartIndex = 0;
-            //_valueStartIndex = 0;
-            //_runningValueLength = 0;
-
-            //_lexemeType = RespLexemeType.None;
-            //_tokenType = RespTokenType.None;
-
-            //_firstSegment = null;
-            //_currentSegment = null;
-
-            //_valueSequence = ReadOnlySequence<byte>.Empty;
-            //_tokenSequence = ReadOnlySequence<byte>.Empty;
         }
     }
 }
