@@ -20,16 +20,14 @@ namespace SlusserLabs.Redis.Resp
         private ReadOnlyMemorySequenceSegment<byte>? _firstSegment;
         private ReadOnlyMemorySequenceSegment<byte>? _currentSegment;
 
-        private RespLexemeType _lexemeType;
+        private long _bytesConsumed;
+        private int _tokenEndPosition;
         private RespTokenType _tokenType;
+        private RespLexemeType _lexemeType;
+        private bool _tokenComplete;
 
-        private int _bytesConsumed; // Within the memory
-        private int _tokenStartIndex; // Where the token begins within the memory
-        private int _valueStartIndex; // Where the token value begins (excluding control byte) within the memory
-        private int _runningValueLength; // The token value length (excluding control bytes)
-
-        private ReadOnlySequence<byte> _valueSequence;
         private ReadOnlySequence<byte> _tokenSequence;
+        private ReadOnlySequence<byte> _valueSequence;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RespReader" /> class.
@@ -49,9 +47,15 @@ namespace SlusserLabs.Redis.Resp
         public RespReaderOptions Options => _options;
 
         /// <summary>
+        /// Gets the total number of bytes consumed by this instance of <see cref="RespReader" />.
+        /// </summary>
+        /// <remarks>Calling <see cref="Reset" /> will zero this value.</remarks>
+        public long BytesConsumed => _bytesConsumed;
+
+        /// <summary>
         /// Gets the type of the last processed RESP token.
         /// </summary>
-        public RespTokenType TokenType => _tokenType;
+        public RespTokenType TokenType => _tokenComplete ? _tokenType : RespTokenType.None;
 
         /// <summary>
         /// Gets the entire byte sequence of the processed <see cref="TokenType" />, including any control bytes.
@@ -68,16 +72,7 @@ namespace SlusserLabs.Redis.Resp
         /// </summary>
         public void Reset()
         {
-            _bytesConsumed = 0;
-            _tokenStartIndex = 0;
-            _valueStartIndex = 0;
-            _runningValueLength = 0;
-
-            _lexemeType = RespLexemeType.None;
-            _tokenType = RespTokenType.None;
-
-            _valueSequence = ReadOnlySequence<byte>.Empty;
-            _tokenSequence = ReadOnlySequence<byte>.Empty;
+            ResetImpl(true);
         }
 
         /// <summary>
@@ -88,36 +83,26 @@ namespace SlusserLabs.Redis.Resp
         /// <returns><c>true</c> if a token was read successfully; otherwise, <c>false</c>.</returns>
         public bool Read(ReadOnlyMemory<byte> input, bool isFinalBlock = false)
         {
-            var result = false;
-
-            // TODO incorporate isFinalBlock?
             if (input.Length == 0)
-                return result;
+                goto DONE;
 
-            // TODO Drop memory that is no longer part of the sequence.
-
-            // Did we return a complete token in the last operation? Reset state for the next run
-            if (_tokenType == RespTokenType.None)
+            if (_tokenComplete)
             {
-                // Start a new memory chain
-                _firstSegment = new ReadOnlyMemorySequenceSegment<byte>(input);
-                _currentSegment = _firstSegment;
+                // Setup for a new token
+                _tokenEndPosition = 0;
+                _tokenType = RespTokenType.None;
                 _lexemeType = RespLexemeType.None;
-                _bytesConsumed = 0;
-                _valueStartIndex = 0;
-                _tokenStartIndex = 0;
-                _runningValueLength = 0;
-            }
-            else
-            {
-                // Append memory to existing chain
-                _currentSegment = _currentSegment!.Append(input);
+
+                _valueSequence = ReadOnlySequence<byte>.Empty;
+                _tokenSequence = ReadOnlySequence<byte>.Empty;
             }
 
-            var span = input.Span;
+            _firstSegment = new ReadOnlyMemorySequenceSegment<byte>(input);
+            _currentSegment = _firstSegment;
+
             var pos = 0;
-
-            while (pos < input.Length)
+            var span = input.Span;
+            while (pos < span.Length)
             {
                 var b = span[pos];
 
@@ -129,61 +114,39 @@ namespace SlusserLabs.Redis.Resp
                         switch (b)
                         {
                             case RespConstants.Plus:
-                                _lexemeType = RespLexemeType.SimpleStringStart;
+                                _lexemeType = RespLexemeType.SimpleString;
                                 _tokenType = RespTokenType.SimpleString;
-                                _tokenStartIndex = _bytesConsumed;
                                 _bytesConsumed++;
+                                _tokenEndPosition++;
                                 pos++;
                                 break;
-
-                            case RespConstants.Minus:
-                                _lexemeType = RespLexemeType.ErrorStart;
-                                _tokenType = RespTokenType.Error;
-                                _tokenStartIndex = _bytesConsumed;
-                                _bytesConsumed++;
-                                pos++;
-                                break;
-
-                            default:
-                                throw new InvalidOperationException("Unrecognized RESP control byte.");
                         }
 
                         break;
 
-                    case RespLexemeType.SimpleStringStart:
-                        // Anything following a '+' control byte
-                        _lexemeType = RespLexemeType.SimpleString;
-                        _valueStartIndex = _bytesConsumed;
+                    case RespLexemeType.SimpleString:
+                        _lexemeType = RespLexemeType.SimpleStringValue;
                         goto REPROCESS;
 
-                    case RespLexemeType.SimpleString:
-                        // Look for the end of the Simple String
+                    case RespLexemeType.SimpleStringValue:
+                        // Look for CR (or illegal characters)
                         switch (b)
                         {
                             case RespConstants.CarriageReturn:
                                 _lexemeType = RespLexemeType.CarriageReturn;
                                 _bytesConsumed++;
+                                _tokenEndPosition++;
                                 pos++;
-                                break;
-
-                            case (byte)'\n':
-                                // TODO Throw because invalid char in Simple String
                                 break;
 
                             default:
                                 _bytesConsumed++;
-                                _runningValueLength++;
+                                _tokenEndPosition++;
                                 pos++;
                                 break;
                         }
 
                         break;
-
-                    case RespLexemeType.ErrorStart:
-                        // Anything following a '-' control byte
-                        _lexemeType = RespLexemeType.Error;
-                        _valueStartIndex = _bytesConsumed;
-                        goto REPROCESS;
 
                     case RespLexemeType.CarriageReturn:
                         // Should only be followed by a LF
@@ -192,20 +155,12 @@ namespace SlusserLabs.Redis.Resp
                             case RespConstants.LineFeed:
                                 _lexemeType = RespLexemeType.LineFeed;
                                 _bytesConsumed++;
-                                result = true;
+                                _tokenEndPosition++;
+                                _tokenComplete = true;
                                 goto DONE;
-
-                            default:
-                                // TODO Throw
-                                break;
                         }
 
                         break;
-
-                    // case RespLexemeType.LineFeed:
-                    //     _lexemeType = RespLexemeType.None;
-                    //     result = true;
-                    //     goto DONE;
                 }
             }
 
@@ -215,7 +170,30 @@ namespace SlusserLabs.Redis.Resp
                 // Ensure we've reached a terminal state
             }
 
-            return result;
+            if (_tokenComplete)
+            {
+                _tokenSequence = new ReadOnlySequence<byte>(_firstSegment!, 0, _currentSegment!, _tokenEndPosition);
+                _valueSequence = new ReadOnlySequence<byte>(_firstSegment!, 1, _currentSegment!, _tokenEndPosition - 2);
+            }
+
+            return _tokenComplete;
+        }
+
+        private void ResetImpl(bool includeBytesConsumed)
+        {
+            //_bytesConsumed = 0;
+            //_tokenStartIndex = 0;
+            //_valueStartIndex = 0;
+            //_runningValueLength = 0;
+
+            //_lexemeType = RespLexemeType.None;
+            //_tokenType = RespTokenType.None;
+
+            //_firstSegment = null;
+            //_currentSegment = null;
+
+            //_valueSequence = ReadOnlySequence<byte>.Empty;
+            //_tokenSequence = ReadOnlySequence<byte>.Empty;
         }
     }
 }

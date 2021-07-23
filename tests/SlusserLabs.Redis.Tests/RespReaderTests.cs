@@ -39,6 +39,37 @@ namespace SlusserLabs.Redis.Resp.Tests
             reader.ValueSequence.Length.ShouldBe(0);
         }
 
+        [Theory]
+        [InlineData("+1\r\n+2\r\n+3\r\n", "1", "2", "3")]
+        public void Read_WithMultipleSimpleStrings_ShouldYieldMultipleTokens(string input, string expected1, string expected2, string expected3)
+        {
+            var reader = new RespReader();
+            var inputBytes = Encoding.ASCII.GetBytes(input);
+            var expectedBytes = new List<byte[]>
+            {
+                Encoding.ASCII.GetBytes(expected1),
+                Encoding.ASCII.GetBytes(expected2),
+                Encoding.ASCII.GetBytes(expected3)
+            };
+
+            var memory = new ReadOnlyMemory<byte>(inputBytes);
+            for (int i = 0; i < 3; i++)
+            {
+                reader.Read(memory).ShouldBeTrue();
+                reader.TokenType.ShouldBe(RespTokenType.SimpleString);
+                reader.TokenSequence.Length.ShouldBe(4);
+                reader.ValueSequence.Length.ShouldBe(1);
+                reader.ValueSequence.ToArray().ShouldBe(expectedBytes[i]);
+
+                memory = memory.Slice((int)reader.TokenSequence.Length);
+            }
+
+            reader.Read(Memory<byte>.Empty, true).ShouldBeTrue();
+            reader.TokenType.ShouldBe(RespTokenType.None);
+            reader.TokenSequence.Length.ShouldBe(0);
+            reader.ValueSequence.Length.ShouldBe(0);
+        }
+
         [Theory(Skip = "Currently causing infinite loop.")]
         [InlineData("+\r\n", "")]
         [InlineData("+OK\r\n", "OK")]
@@ -60,9 +91,9 @@ namespace SlusserLabs.Redis.Resp.Tests
         }
 
         [Theory(Skip = "Currently causing infinite loop.")]
-        // [InlineData("+\r\n", "")]
+        [InlineData("+\r\n", "")]
         [InlineData("+OK\r\n", "OK")]
-        // [InlineData("+Hello World!\r\n", "Hello World!")]
+        [InlineData("+Hello World!\r\n", "Hello World!")]
         public void ReadMultiSegment_WithSimpleString_ShouldYieldValue(string input, string expected)
         {
             var sequence = new List<Memory<byte>>();

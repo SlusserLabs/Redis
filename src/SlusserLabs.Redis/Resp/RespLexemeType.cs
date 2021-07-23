@@ -14,8 +14,9 @@ namespace SlusserLabs.Redis.Resp
         None,
         CarriageReturn,
         LineFeed,
-        SimpleStringStart,
         SimpleString,
+        SimpleStringValue,
+        // SimpleString,
         ErrorStart,
         Error
     }
