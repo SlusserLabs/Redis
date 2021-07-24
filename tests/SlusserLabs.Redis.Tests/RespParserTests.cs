@@ -18,6 +18,9 @@ namespace SlusserLabs.Redis.Tests
     {
         [Theory]
         [InlineData("-1", -1)]
+        [InlineData("0", 0)]
+        [InlineData("1", 1)]
+        [InlineData("123", 123)]
         public void TryParsePrefixedLength_WithValidPrefixedLengths_Succeeds(string input, long expected)
         {
             var bytes = Encoding.ASCII.GetBytes(input);

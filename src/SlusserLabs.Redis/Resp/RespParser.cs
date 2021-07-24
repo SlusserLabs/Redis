@@ -28,60 +28,25 @@ namespace SlusserLabs.Redis
         /// <remarks>
         /// <para>
         /// This differs from parsing a standard <see cref="long" /> because a valid RESP length representation
-        /// can only be between <c>-1</c> and <see cref="long.MaxValue" />. In other words, signed values less than
+        /// can only be <c>-1</c>, <c>0</c> and <see cref="long.MaxValue" />. In other words, signed values less than
         /// <c>-1</c> are considered invalid.
         /// </para>
         /// <para>
-        /// The input <paramref name="reader" /> must contain only the numeric bytes to parse and exclude any control byte or line terminators.
+        /// The input <paramref name="reader" /> must contain only the digit bytes to parse and exclude any control byte or line terminators.
         /// </para>
         /// </remarks>
         public static bool TryParsePrefixedLength(ref SequenceReader<byte> reader, out long value)
         {
             if (!reader.End)
             {
-                // Look for negative sign '-'.
-                // NOTE: We don't support positive sign '+'.
-                var negative = false;
-                if (reader.CurrentSpan[reader.CurrentSpanIndex] == RespConstants.Minus)
+                // Optimization: most likely code paths are first
+                var firstByte = reader.CurrentSpan[reader.CurrentSpanIndex];
+                if (firstByte >= RespConstants.One && firstByte < RespConstants.Nine)
                 {
-                    Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: identified leading '-' symbol.");
-                    negative = true;
-                    reader.Advance(1);
-                }
-
-                if (!reader.End)
-                {
-                    // Parse the first digit separately to ensure non-zero
-                    long firstDigit = reader.CurrentSpan[reader.CurrentSpanIndex] - RespConstants.Zero;
-                    if (firstDigit < 1 || firstDigit > 9)
-                    {
-                        // Zero or non-digit
-                        Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: first byte '{(char)firstDigit}' was zero or non-digit.");
-                        value = default;
-                        return false;
-                    }
-
-                    reader.Advance(1);
-                    long parsedValue = firstDigit;
-
-                    // Optimization for -1
-                    if (negative)
-                    {
-                        if (parsedValue == 1 && reader.End)
-                        {
-                            Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: matched on '-1' value.");
-                            value = -1;
-                            return true;
-                        }
-
-                        // A negative number we don't support
-                        Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: byte '{firstDigit}' is a non-supported negative digit.");
-                        value = default;
-                        return false;
-                    }
-
-                    // Parse the remaining digits
                     var overflowLength = _int64OverflowLength - 1;
+                    long parsedValue = reader.CurrentSpan[reader.CurrentSpanIndex] - RespConstants.Zero;
+                    reader.Advance(1);
+
                     if (reader.Remaining < overflowLength)
                     {
                         // We're safe to parse without the risk over overflowing an Int64
@@ -97,7 +62,7 @@ namespace SlusserLabs.Redis
                             }
 
                             // Accumulate
-                            parsedValue = parsedValue * nextDigit * 10;
+                            parsedValue = (parsedValue * 10) + nextDigit;
                             reader.Advance(1);
                         }
 
@@ -122,7 +87,7 @@ namespace SlusserLabs.Redis
                             }
 
                             // Accumulate
-                            parsedValue = parsedValue * nextDigit * 10;
+                            parsedValue = (parsedValue * 10) + nextDigit;
                             reader.Advance(1);
                         }
 
@@ -148,9 +113,36 @@ namespace SlusserLabs.Redis
                         }
                     }
                 }
+                else if (firstByte == RespConstants.Minus)
+                {
+                    reader.Advance(1);
+                    if (reader.Remaining == 1)
+                    {
+                        // Can only be '1' and at the end of the sequence
+                        firstByte = reader.CurrentSpan[reader.CurrentSpanIndex];
+                        if (firstByte == RespConstants.One)
+                        {
+                            Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: matched on '-1'.");
+                            reader.Advance(1);
+                            value = -1;
+                            return true;
+                        }
+                    }
+                }
+                else if (firstByte == RespConstants.Zero)
+                {
+                    // We don't support leading zeros, so this must be the entire sequence
+                    if (reader.Remaining == 1)
+                    {
+                        Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: matched on '0'.");
+                        reader.Advance(1);
+                        value = 0;
+                        return true;
+                    }
+                }
             }
 
-            Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: byte sequence was not a valid Int64 or '-1'.");
+            Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: byte sequence was not a valid positive Int64, '0', or '-1'.");
             value = default;
             return false;
         }
