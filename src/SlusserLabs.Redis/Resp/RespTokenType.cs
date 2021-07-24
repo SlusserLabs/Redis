@@ -30,6 +30,11 @@ namespace SlusserLabs.Redis.Resp
         Error,
 
         /// <summary>
+        /// The token is a RESP Bulk String prefixed length
+        /// </summary>
+        BulkStringPrefixedLength,
+
+        /// <summary>
         /// The token is a RESP Bulk String.
         /// </summary>
         BulkString

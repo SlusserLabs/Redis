@@ -19,18 +19,9 @@ namespace SlusserLabs.Redis.Resp
         private RespReaderOptions _options;
 
         private long _bytesConsumed;
-
-        private RespReaderState _state;
-
-        private int _valueStart;
-        private int _tokenLength;
-        private bool _tokenComplete;
         private RespTokenType _tokenType;
-
-        private int? _bulkStringLength;
-
-        private ReadOnlyMemorySequenceSegment<byte>? _startSegment;
-        private ReadOnlyMemorySequenceSegment<byte>? _currentSegment;
+        private ReadOnlySequence<byte> _tokenSequence;
+        private ReadOnlySequence<byte> _valueSequence;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RespReader" /> class.
@@ -39,22 +30,6 @@ namespace SlusserLabs.Redis.Resp
         public RespReader(RespReaderOptions options = default)
         {
             _options = options;
-        }
-
-        private enum RespReaderState
-        {
-            None,
-
-            BulkStringDollar,
-            BulkStringLengthNegativeSign,
-            BulkStringLengthNegativeOne,
-            BulkStringLengthFirstNumeric,
-            BulkStringLengthNumeric,
-            BulkStringLengthCarriageReturn,
-            BulkStringLengthLineFeed,
-            BulkStringValue,
-            BulkStringValueCarriageReturn,
-            BulkStringValueLineFeed
         }
 
         /// <summary>
@@ -69,155 +44,80 @@ namespace SlusserLabs.Redis.Resp
         public long BytesConsumed => _bytesConsumed;
 
         /// <summary>
-        /// Gets the number of bytes in the current token.
-        /// </summary>
-        public int TokenLength
-        {
-            get
-            {
-                if (_tokenComplete == false)
-                    return 0;
-
-                return _tokenLength;
-            }
-        }
-
-        /// <summary>
         /// Gets the type of the last processed RESP token.
         /// </summary>
-        public RespTokenType TokenType
-        {
-            get
-            {
-                if (_tokenComplete == false)
-                    return RespTokenType.None;
-
-                return _tokenType;
-            }
-        }
+        public RespTokenType TokenType => _tokenType;
 
         /// <summary>
         /// Gets the entire byte sequence of the processed <see cref="TokenType" />, including any control bytes.
         /// </summary>
-        public ReadOnlySequence<byte> TokenSequence
-        {
-            get
-            {
-                if (_tokenComplete == false)
-                    return ReadOnlySequence<byte>.Empty;
-
-                return new ReadOnlySequence<byte>(_startSegment!, 0, _currentSegment!, _tokenLength);
-            }
-        }
+        public ReadOnlySequence<byte> TokenSequence => _tokenSequence;
 
         /// <summary>
         /// Gets the byte sequence of the processed <see cref="TokenType" />, excluding any control bytes.
         /// </summary>
-        public ReadOnlySequence<byte> ValueSequence
-        {
-            get
-            {
-                if (_tokenComplete == false)
-                    return ReadOnlySequence<byte>.Empty;
-
-                // Same as token sequence without control bytes
-                return new ReadOnlySequence<byte>(_startSegment!, _valueStart, _currentSegment!, _tokenLength - _valueStart - 2);
-            }
-        }
+        public ReadOnlySequence<byte> ValueSequence => _valueSequence;
 
         /// <summary>
         /// Resets the internal state of this instance so it can be reused.
         /// </summary>
         public void Reset()
         {
-            //_bytesConsumed = 0;
+            _bytesConsumed = 0;
 
-            //_valueStart = 0;
-            //_tokenLength = 0;
-            //_tokenComplete = false;
-            //_tokenType = RespTokenType.None;
-            //_lexemeType = RespLexemeType.None;
-
-            //_startSegment = null;
-            //_currentSegment = null;
+            _tokenType = RespTokenType.None;
+            _tokenSequence = ReadOnlySequence<byte>.Empty;
+            _valueSequence = ReadOnlySequence<byte>.Empty;
         }
 
         /// <summary>
-        /// Reads the next RESP token from the input.
+        /// Tries to read the next RESP token from the input.
         /// </summary>
-        /// <param name="input">The byte data to read from.</param>
-        /// <param name="isFinalBlock">Indicates whether <paramref name="input" /> is the last of the input to process.</param>
+        /// <param name="sequenceReader">The byte sequence to read from.</param>
         /// <returns><c>true</c> if a token was read successfully; otherwise, <c>false</c>.</returns>
-        public bool Read(ReadOnlyMemory<byte> input, bool isFinalBlock = false)
+        /// <exception cref="RespException">The byte sequence contains invalid RESP data.</exception>
+        /// <remarks>
+        /// Unless an exception is thrown, the caller should assume the sequence did not contain enough data to read
+        /// an entire token and should try again by pass a longer sequence of bytes.
+        /// </remarks>
+        public bool TryRead(ref SequenceReader<byte> sequenceReader)
         {
-            var result = false;
-            if (input.Length > 0)
+            // To keep the code simple, we make a deliberate trade-off and only Advance on complete token boundaries.
+            // Allowing the parser to pause at any position, mid-token, requires maintaining a LOT of state and introduces
+            // complexity in resuming from that state. Choosing to parse only entire tokens may mean we reprocess bytes we've
+            // already seen if we didn't have enough data to complete the token boundary in the last pass, however, those
+            // cases should be rare. Most of the time we're going to have enough data for an entire token.
+
+            // Reset any previous state
+            _tokenType = RespTokenType.None;
+            _tokenSequence = ReadOnlySequence<byte>.Empty;
+            _valueSequence = ReadOnlySequence<byte>.Empty;
+
+            if (!sequenceReader.End)
             {
-                // Starting from a completed token or first run?
-                if (_tokenType != RespTokenType.None || _state == RespReaderState.None)
-                {
-                    _startSegment = new ReadOnlyMemorySequenceSegment<byte>(input);
-                    _currentSegment = _startSegment;
-                }
-                else
-                {
-                    _currentSegment = _currentSegment!.Append(input);
-                }
-
-                var pos = 0;
-                var buffer = input.Span;
-
-                switch (_state)
-                {
-                    case RespReaderState.None:
-                        result = ConsumeControlByte(buffer, ref pos);
-                        break;
-
-                    case RespReaderState.BulkStringDollar:
-                    case RespReaderState.BulkStringLengthNegativeSign:
-                    case RespReaderState.BulkStringLengthNegativeOne:
-                    case RespReaderState.BulkStringLengthFirstNumeric:
-                    case RespReaderState.BulkStringLengthNumeric:
-                    case RespReaderState.BulkStringLengthCarriageReturn:
-                    case RespReaderState.BulkStringLengthLineFeed:
-                    case RespReaderState.BulkStringValue:
-                    case RespReaderState.BulkStringValueCarriageReturn:
-                    case RespReaderState.BulkStringValueLineFeed:
-                        result = ConsumeBulkString(buffer, ref pos);
-                        break;
-
-                    default:
-                        throw new InvalidOperationException(); // Not a valid state
-                }
-
-                // Update running totals
-                _bytesConsumed += pos;
-                _tokenLength += pos;
-            }
-
-            return result;
-        }
-
-        private bool ConsumeControlByte(ReadOnlySpan<byte> buffer, ref int pos)
-        {
-            Debug.Assert(pos == 0);
-            Debug.Assert(buffer.Length > 0);
-            Debug.Assert(_state == RespReaderState.None);
-            Debug.Assert(_tokenType == RespTokenType.None);
-
-            while (pos < buffer.Length)
-            {
-                var b = buffer[pos];
-                switch (b)
+                // Read the control byte
+                var firstByte = sequenceReader.CurrentSpan[sequenceReader.CurrentSpanIndex];
+                switch (firstByte)
                 {
                     case RespConstants.Dollar:
-                        _state = RespReaderState.BulkStringDollar;
-                        pos++;
-                        return ConsumeBulkString(buffer, ref pos);
-
-                    default:
-                        throw new RespException(); // TODO Not a control byte
+                        return TryReadBulkStringLength(ref sequenceReader);
                 }
+            }
+
+            return false;
+        }
+
+        private bool TryReadBulkStringLength(ref SequenceReader<byte> reader)
+        {
+            Debug.Assert(reader.CurrentSpan[reader.CurrentSpanIndex] == RespConstants.Dollar);
+
+            if (reader.TryReadTo(out ReadOnlySequence<byte> tokenSequence, RespConstants.CarriageReturnLineFeed))
+            {
+                _tokenType = RespTokenType.BulkStringPrefixedLength;
+                _tokenSequence = reader.GetConsumedSequence();
+                _valueSequence = tokenSequence.Slice(1); // Trim control byte
+
+                return true;
             }
 
             return false;

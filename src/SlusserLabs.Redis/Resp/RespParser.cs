@@ -148,3 +148,7 @@ namespace SlusserLabs.Redis
         }
     }
 }
+
+// References:
+// https://github.com/dotnet/runtime/blob/v5.0.8/src/libraries/System.Private.CoreLib/src/System/Buffers/Text/Utf8Parser/Utf8Parser.Integer.Signed.D.cs
+// https://github.com/davidfowl/TcpEcho/issues/15#issuecomment-528459145

@@ -16,11 +16,11 @@ namespace ConsoleApp1
             var reader = new RespReader();
             var input = Encoding.ASCII.GetBytes("$-1\r\n");
 
-            var result = reader.Read(input, true);
+            //var result = reader.Read(input, true);
 
-            Console.WriteLine($"Result: {result}, TokenType: {reader.TokenType}, TokenLength: {reader.TokenLength}, BytesConsumed: {reader.BytesConsumed}");
-            Console.WriteLine($"Token: {Encoding.ASCII.GetString(reader.TokenSequence)}");
-            Console.WriteLine($"Value: {Encoding.ASCII.GetString(reader.ValueSequence)}");
+            //Console.WriteLine($"Result: {result}, TokenType: {reader.TokenType}, TokenLength: {reader.TokenLength}, BytesConsumed: {reader.BytesConsumed}");
+            //Console.WriteLine($"Token: {Encoding.ASCII.GetString(reader.TokenSequence)}");
+            //Console.WriteLine($"Value: {Encoding.ASCII.GetString(reader.ValueSequence)}");
         }
     }
 }

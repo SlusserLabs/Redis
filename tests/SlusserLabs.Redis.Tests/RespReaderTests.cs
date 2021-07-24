@@ -21,10 +21,37 @@ namespace SlusserLabs.Redis.Resp.Tests
         {
             var reader = new RespReader();
 
+            reader.BytesConsumed.ShouldBe(0);
             reader.TokenType.ShouldBe(RespTokenType.None);
             reader.TokenSequence.Length.ShouldBe(0);
             reader.ValueSequence.Length.ShouldBe(0);
         }
+
+        [Theory]
+        [InlineData("$-1\r\n", -1)]
+        [InlineData("$0\r\n", 0)]
+        [InlineData("$1\r\n", 1)]
+        [InlineData("$1234567890\r\n", 1234567890)]
+        [InlineData("$9876543210\r\n", 9876543210)]
+        public void TryRead_BulkStringPrefixedLength_ShouldSucceed(string input, long expected)
+        {
+            var reader = new RespReader();
+            var bytes = Encoding.ASCII.GetBytes(input);
+            var sequenceReader = new SequenceReader<byte>(new ReadOnlySequence<byte>(bytes));
+
+            reader.TryRead(ref sequenceReader).ShouldBeTrue();
+            reader.TokenType.ShouldBe(RespTokenType.BulkStringPrefixedLength);
+            reader.TokenSequence.ToArray().ShouldBe(sequenceReader.GetConsumedSequence().ToArray());
+            sequenceReader.End.ShouldBeTrue();
+
+            var prefixedLengthSequenceReader = new SequenceReader<byte>(reader.ValueSequence);
+            RespParser.TryParsePrefixedLength(ref prefixedLengthSequenceReader, out var lengthPrefix).ShouldBeTrue();
+            lengthPrefix.ShouldBe(expected);
+            prefixedLengthSequenceReader.End.ShouldBeTrue();
+        }
+
+        /*
+
 
         [Fact]
         public void Reset_ShouldHaveInitialState()
@@ -117,5 +144,6 @@ namespace SlusserLabs.Redis.Resp.Tests
             // Assert.Equal(memory.ToArray(), reader.TokenSequence.First.ToArray());
             // Assert.Equal(expectedBytes.ToArray(), reader.ValueSequence.First.ToArray());
         }
+        */
     }
 }
