@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,8 +14,13 @@ namespace SlusserLabs.Redis.Resp
         None,
         CarriageReturn,
         LineFeed,
-        SimpleStringStart,
-        SimpleString
-
+        SimpleString,
+        SimpleStringValue,
+        Error,
+        ErrorValue,
+        Dollar,
+        BulkStringLength,
+        BulkStringValue,
+        Negative
     }
 }

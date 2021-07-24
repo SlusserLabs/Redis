@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -28,7 +31,7 @@ namespace SlusserLabs.Redis.Resp
         private long _bytesCommitted;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="RespWriter" /> class with the specified <see cref="IBufferWriter{byte}" /> <paramref name="output" />.
+        /// Initializes a new instance of the <see cref="RespWriter" /> class with the specified <see cref="IBufferWriter{T}" /> <paramref name="output" />.
         /// </summary>
         /// <param name="output">The buffer to write RESP data to.</param>
         /// <param name="options">Defines custom behavior of the writer.</param>
@@ -72,7 +75,7 @@ namespace SlusserLabs.Redis.Resp
         /// Gets the number of bytes written to the output by the <see cref="RespWriter" />.
         /// </summary>
         /// <remarks>
-        /// For instances constructed with <see cref="IBufferWriter{byte}" />, this is how much the buffer has advanced.
+        /// For instances constructed with <see cref="IBufferWriter{T}" />, this is how much the buffer has advanced.
         /// For instances constructed with <see cref="Stream" />, this is the number of bytes written to the stream.
         /// </remarks>
         public long BytesCommitted => _bytesCommitted;
@@ -81,7 +84,7 @@ namespace SlusserLabs.Redis.Resp
         /// Commits the RESP data buffered so far to the output.
         /// </summary>
         /// <remarks>
-        /// For instances constructed with <see cref="IBufferWriter{byte}" />, this advances the writer to include the buffered data.
+        /// For instances constructed with <see cref="IBufferWriter{T}" />, this advances the writer to include the buffered data.
         /// For instances constructed with <see cref="Stream" />, this writes data to the stream and flushes it.
         /// </remarks>
         /// <exception cref="ObjectDisposedException">The <see cref="RespWriter" /> has been disposed.</exception>
