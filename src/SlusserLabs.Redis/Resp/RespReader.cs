@@ -4,6 +4,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,19 +14,22 @@ namespace SlusserLabs.Redis.Resp
     /// <summary>
     /// Provides a high-performance API for forward-only, read-only access to REdis Serialization Protocol (RESP) v2 encoded data.
     /// </summary>
-    public sealed class RespReader
+    public sealed partial class RespReader
     {
         private RespReaderOptions _options;
 
         private long _bytesConsumed;
 
+        private RespReaderState _state;
+
         private int _valueStart;
         private int _tokenLength;
         private bool _tokenComplete;
         private RespTokenType _tokenType;
-        private RespLexemeType _lexemeType;
 
-        private ReadOnlyMemorySequenceSegment<byte>? _firstSegment;
+        private int? _bulkStringLength;
+
+        private ReadOnlyMemorySequenceSegment<byte>? _startSegment;
         private ReadOnlyMemorySequenceSegment<byte>? _currentSegment;
 
         /// <summary>
@@ -35,6 +39,22 @@ namespace SlusserLabs.Redis.Resp
         public RespReader(RespReaderOptions options = default)
         {
             _options = options;
+        }
+
+        private enum RespReaderState
+        {
+            None,
+
+            BulkStringDollar,
+            BulkStringLengthNegativeSign,
+            BulkStringLengthNegativeOne,
+            BulkStringLengthFirstNumeric,
+            BulkStringLengthNumeric,
+            BulkStringLengthCarriageReturn,
+            BulkStringLengthLineFeed,
+            BulkStringValue,
+            BulkStringValueCarriageReturn,
+            BulkStringValueLineFeed
         }
 
         /// <summary>
@@ -86,7 +106,7 @@ namespace SlusserLabs.Redis.Resp
                 if (_tokenComplete == false)
                     return ReadOnlySequence<byte>.Empty;
 
-                return new ReadOnlySequence<byte>(_firstSegment!, 0, _currentSegment!, _tokenLength);
+                return new ReadOnlySequence<byte>(_startSegment!, 0, _currentSegment!, _tokenLength);
             }
         }
 
@@ -101,7 +121,7 @@ namespace SlusserLabs.Redis.Resp
                     return ReadOnlySequence<byte>.Empty;
 
                 // Same as token sequence without control bytes
-                return new ReadOnlySequence<byte>(_firstSegment!, 1, _currentSegment!, _tokenLength - 2);
+                return new ReadOnlySequence<byte>(_startSegment!, _valueStart, _currentSegment!, _tokenLength - _valueStart - 2);
             }
         }
 
@@ -110,15 +130,16 @@ namespace SlusserLabs.Redis.Resp
         /// </summary>
         public void Reset()
         {
-            _bytesConsumed = 0;
+            //_bytesConsumed = 0;
 
-            _tokenLength = 0;
-            _tokenComplete = false;
-            _tokenType = RespTokenType.None;
-            _lexemeType = RespLexemeType.None;
+            //_valueStart = 0;
+            //_tokenLength = 0;
+            //_tokenComplete = false;
+            //_tokenType = RespTokenType.None;
+            //_lexemeType = RespLexemeType.None;
 
-            _firstSegment = null;
-            _currentSegment = null;
+            //_startSegment = null;
+            //_currentSegment = null;
         }
 
         /// <summary>
@@ -129,107 +150,73 @@ namespace SlusserLabs.Redis.Resp
         /// <returns><c>true</c> if a token was read successfully; otherwise, <c>false</c>.</returns>
         public bool Read(ReadOnlyMemory<byte> input, bool isFinalBlock = false)
         {
-            if (input.Length == 0)
-                goto DONE;
-
-            if (_tokenComplete || _tokenType == RespTokenType.None)
+            var result = false;
+            if (input.Length > 0)
             {
-                // Setup for a new (or first) token
-                _tokenLength = 0;
-                _tokenComplete = false;
-                _tokenType = RespTokenType.None;
-                _lexemeType = RespLexemeType.None;
+                // Starting from a completed token or first run?
+                if (_tokenType != RespTokenType.None || _state == RespReaderState.None)
+                {
+                    _startSegment = new ReadOnlyMemorySequenceSegment<byte>(input);
+                    _currentSegment = _startSegment;
+                }
+                else
+                {
+                    _currentSegment = _currentSegment!.Append(input);
+                }
 
-                _firstSegment = new ReadOnlyMemorySequenceSegment<byte>(input);
-                _currentSegment = _firstSegment;
+                var pos = 0;
+                var buffer = input.Span;
+
+                switch (_state)
+                {
+                    case RespReaderState.None:
+                        result = ConsumeControlByte(buffer, ref pos);
+                        break;
+
+                    case RespReaderState.BulkStringDollar:
+                    case RespReaderState.BulkStringLengthNegativeSign:
+                    case RespReaderState.BulkStringLengthNegativeOne:
+                    case RespReaderState.BulkStringLengthFirstNumeric:
+                    case RespReaderState.BulkStringLengthNumeric:
+                    case RespReaderState.BulkStringLengthCarriageReturn:
+                    case RespReaderState.BulkStringLengthLineFeed:
+                    case RespReaderState.BulkStringValue:
+                    case RespReaderState.BulkStringValueCarriageReturn:
+                    case RespReaderState.BulkStringValueLineFeed:
+                        result = ConsumeBulkString(buffer, ref pos);
+                        break;
+
+                    default:
+                        throw new InvalidOperationException(); // Not a valid state
+                }
+
+                // Update running totals
+                _bytesConsumed += pos;
+                _tokenLength += pos;
             }
-            else
-            {
-                // Continue processing the current token
-                _currentSegment = _currentSegment!.Append(input);
-            }
 
-            var pos = 0;
-            var span = input.Span;
-
-            switch (_tokenType)
-            {
-                case RespTokenType.SimpleString:
-                    ConsumeSimpleString(span, ref pos);
-                    break;
-
-                default:
-                    ConsumeControlByte(span, ref pos);
-                    break;
-            }
-
-        DONE:
-            return _tokenComplete;
+            return result;
         }
 
-        private bool ConsumeControlByte(ReadOnlySpan<byte> span, ref int pos)
+        private bool ConsumeControlByte(ReadOnlySpan<byte> buffer, ref int pos)
         {
-            while (pos < span.Length)
+            Debug.Assert(pos == 0);
+            Debug.Assert(buffer.Length > 0);
+            Debug.Assert(_state == RespReaderState.None);
+            Debug.Assert(_tokenType == RespTokenType.None);
+
+            while (pos < buffer.Length)
             {
-                var b = span[pos];
+                var b = buffer[pos];
                 switch (b)
                 {
-                    case RespConstants.Plus:
-                        _lexemeType = RespLexemeType.SimpleString;
-                        _tokenType = RespTokenType.SimpleString;
-                        _bytesConsumed++;
-                        _valueStart++;
-                        _tokenLength++;
+                    case RespConstants.Dollar:
+                        _state = RespReaderState.BulkStringDollar;
                         pos++;
-                        return ConsumeSimpleString(span, ref pos);
+                        return ConsumeBulkString(buffer, ref pos);
 
                     default:
                         throw new RespException(); // TODO Not a control byte
-                }
-            }
-
-            return false;
-        }
-
-        private bool ConsumeSimpleString(ReadOnlySpan<byte> span, ref int pos)
-        {
-            while (pos < span.Length)
-            {
-                var b = span[pos];
-                switch (_lexemeType)
-                {
-                    case RespLexemeType.SimpleStringValue:
-                        // Look for CR (or illegal characters)
-                        switch (b)
-                        {
-                            case RespConstants.CarriageReturn:
-                                _lexemeType = RespLexemeType.CarriageReturn;
-                                _bytesConsumed++;
-                                _tokenLength++;
-                                pos++;
-                                break;
-
-                            default:
-                                _bytesConsumed++;
-                                _tokenLength++;
-                                pos++;
-                                break;
-                        }
-
-                        break;
-
-                    case RespLexemeType.CarriageReturn:
-                        // Should only be followed by a LF
-                        switch (b)
-                        {
-                            case RespConstants.LineFeed:
-                                _lexemeType = RespLexemeType.LineFeed;
-                                _bytesConsumed++;
-                                _tokenLength++;
-                                return true;
-                        }
-
-                        break;
                 }
             }
 

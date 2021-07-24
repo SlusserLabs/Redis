@@ -18,8 +18,9 @@ namespace SlusserLabs.Redis.Resp
         SimpleStringValue,
         Error,
         ErrorValue,
-        BulkString,
+        Dollar,
         BulkStringLength,
-        BulkStringValue
+        BulkStringValue,
+        Negative
     }
 }
