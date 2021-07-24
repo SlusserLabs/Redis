@@ -41,7 +41,7 @@ namespace SlusserLabs.Redis
             {
                 // Optimization: most likely code paths are first
                 var firstByte = reader.CurrentSpan[reader.CurrentSpanIndex];
-                if (firstByte >= RespConstants.One && firstByte < RespConstants.Nine)
+                if (firstByte >= RespConstants.One && firstByte <= RespConstants.Nine)
                 {
                     var overflowLength = _int64OverflowLength - 1;
                     long parsedValue = reader.CurrentSpan[reader.CurrentSpanIndex] - RespConstants.Zero;
@@ -93,7 +93,7 @@ namespace SlusserLabs.Redis
 
                         // Handle the last digit
                         long lastDigit = reader.CurrentSpan[reader.CurrentSpanIndex] - RespConstants.Zero;
-                        if (lastDigit < 0 || lastDigit > 8)
+                        if (lastDigit < 0 || lastDigit > 7)
                         {
                             // Too large for a signed In64
                             Debug.WriteLine($"{nameof(TryParsePrefixedLength)}: last byte '{lastDigit}' exceeded Int64 limit or was non-digit.");
@@ -101,7 +101,7 @@ namespace SlusserLabs.Redis
                             return false;
                         }
 
-                        parsedValue = parsedValue * lastDigit * 10;
+                        parsedValue = (parsedValue * 10) + lastDigit;
                         reader.Advance(1);
 
                         if (reader.End)
