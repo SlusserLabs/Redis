@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SlusserLabs.Redis.Resp;
 
-namespace SlusserLabs.Redis
+namespace SlusserLabs.Redis.Resp
 {
     /// <summary>
     /// Provides static methods for parsing common RESP byte sequences.
@@ -148,3 +148,7 @@ namespace SlusserLabs.Redis
         }
     }
 }
+
+// References:
+// https://github.com/dotnet/runtime/blob/v5.0.8/src/libraries/System.Private.CoreLib/src/System/Buffers/Text/Utf8Parser/Utf8Parser.Integer.Signed.D.cs
+// https://github.com/davidfowl/TcpEcho/issues/15#issuecomment-528459145

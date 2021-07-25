@@ -21,6 +21,7 @@ namespace SlusserLabs.Redis.Resp.Tests
         {
             var reader = new RespReader();
 
+            reader.BytesConsumed.ShouldBe(0);
             reader.TokenType.ShouldBe(RespTokenType.None);
             reader.TokenSequence.Length.ShouldBe(0);
             reader.ValueSequence.Length.ShouldBe(0);
@@ -30,14 +31,135 @@ namespace SlusserLabs.Redis.Resp.Tests
         public void Reset_ShouldHaveInitialState()
         {
             var reader = new RespReader();
+            var bytes = Encoding.ASCII.GetBytes("+OK\r\n");
+            var sequenceReader = new SequenceReader<byte>(new ReadOnlySequence<byte>(bytes));
 
-            reader.Read(Encoding.ASCII.GetBytes("+\r\n"));
+            reader.TryRead(ref sequenceReader).ShouldBeTrue();
             reader.Reset();
+
+            reader.BytesConsumed.ShouldBe(0);
+            reader.TokenType.ShouldBe(RespTokenType.None);
+            reader.TokenSequence.Length.ShouldBe(0);
+            reader.ValueSequence.Length.ShouldBe(0);
+        }
+
+        [Theory]
+        [InlineData("+\r\n", "")]
+        [InlineData("+OK\r\n", "OK")]
+        public void TryRead_WithSimpleString_ShouldSucceed(string input, string expected)
+        {
+            var reader = new RespReader();
+            var bytes = Encoding.ASCII.GetBytes(input);
+            var sequenceReader = new SequenceReader<byte>(new ReadOnlySequence<byte>(bytes));
+
+            reader.TryRead(ref sequenceReader).ShouldBeTrue();
+            reader.TokenType.ShouldBe(RespTokenType.SimpleString);
+            reader.TokenSequence.ToArray().ShouldBe(sequenceReader.GetConsumedSequence().ToArray());
+            sequenceReader.End.ShouldBeTrue();
+
+            Encoding.ASCII.GetString(reader.ValueSequence).ShouldBe(expected);
+        }
+
+        [Theory]
+        [InlineData("-\r\n", "")]
+        [InlineData("-Error message\r\n", "Error message")]
+        [InlineData("-ERR unknown command 'foobar'\r\n", "ERR unknown command 'foobar'")]
+        [InlineData("-WRONGTYPE Operation against a key holding the wrong kind of value\r\n", "WRONGTYPE Operation against a key holding the wrong kind of value")]
+        public void TryRead_WithError_ShouldSucceed(string input, string expected)
+        {
+            var reader = new RespReader();
+            var bytes = Encoding.ASCII.GetBytes(input);
+            var sequenceReader = new SequenceReader<byte>(new ReadOnlySequence<byte>(bytes));
+
+            reader.TryRead(ref sequenceReader).ShouldBeTrue();
+            reader.TokenType.ShouldBe(RespTokenType.Error);
+            reader.TokenSequence.ToArray().ShouldBe(sequenceReader.GetConsumedSequence().ToArray());
+            sequenceReader.End.ShouldBeTrue();
+
+            Encoding.ASCII.GetString(reader.ValueSequence).ShouldBe(expected);
+        }
+
+        [Theory]
+        [InlineData("$-1\r\n", -1)]
+        [InlineData("$0\r\n", 0)]
+        [InlineData("$1\r\n", 1)]
+        [InlineData("$1234567890\r\n", 1234567890)]
+        [InlineData("$9876543210\r\n", 9876543210)]
+        public void TryRead_WithBulkStringPrefixedLength_ShouldSucceed(string input, long expected)
+        {
+            var reader = new RespReader();
+            var bytes = Encoding.ASCII.GetBytes(input);
+            var sequenceReader = new SequenceReader<byte>(new ReadOnlySequence<byte>(bytes));
+
+            reader.TryRead(ref sequenceReader).ShouldBeTrue();
+            reader.TokenType.ShouldBe(RespTokenType.BulkStringPrefixedLength);
+            reader.TokenSequence.ToArray().ShouldBe(sequenceReader.GetConsumedSequence().ToArray());
+            sequenceReader.End.ShouldBeTrue();
+
+            var prefixedLengthSequenceReader = new SequenceReader<byte>(reader.ValueSequence);
+            RespParser.TryParsePrefixedLength(ref prefixedLengthSequenceReader, out var lengthPrefix).ShouldBeTrue();
+            lengthPrefix.ShouldBe(expected);
+            prefixedLengthSequenceReader.End.ShouldBeTrue();
+        }
+
+        [Theory]
+        [InlineData("\r\n", 0, "")]
+        [InlineData("abc123\r\n", 6, "abc123")]
+        [InlineData("abc\r\n123\r\n", 8, "abc\r\n123")]
+        public void TryReadBulkString_WithBulkString_ShouldSucceed(string input, long length, string expected)
+        {
+            var reader = new RespReader();
+            var bytes = Encoding.ASCII.GetBytes(input);
+            var sequenceReader = new SequenceReader<byte>(new ReadOnlySequence<byte>(bytes));
+
+            reader.TryReadBulkString(ref sequenceReader, length).ShouldBeTrue();
+            reader.TokenType.ShouldBe(RespTokenType.BulkString);
+            reader.TokenSequence.ToArray().ShouldBe(sequenceReader.GetConsumedSequence().ToArray());
+            sequenceReader.End.ShouldBeTrue();
+
+            Encoding.ASCII.GetString(reader.ValueSequence).ShouldBe(expected);
+        }
+
+        [Theory]
+        [InlineData("ab", 0)]
+        [InlineData("abc", 1)]
+        [InlineData("abc\r\nab", 5)]
+        [InlineData("abc\r\nabc", 6)]
+        public void TryReadBulkString_WithoutLineDelimiter_ShouldThrowException(string input, long length)
+        {
+            var reader = new RespReader();
+            var bytes = Encoding.ASCII.GetBytes(input);
+
+            Should.Throw<RespException>(() =>
+            {
+                var sequenceReader = new SequenceReader<byte>(new ReadOnlySequence<byte>(bytes));
+                reader.TryReadBulkString(ref sequenceReader, length);
+            }).BytePosition.ShouldBe(length);
 
             reader.TokenType.ShouldBe(RespTokenType.None);
             reader.TokenSequence.Length.ShouldBe(0);
             reader.ValueSequence.Length.ShouldBe(0);
         }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(RespConstants.MaxBulkStringLength + 1)]
+        public void TryReadBulkString_WithInvalidLength_ThrowsArgumentOutOfRangeException(long length)
+        {
+            var reader = new RespReader();
+
+            Should.Throw<ArgumentOutOfRangeException>(() =>
+            {
+                var sequenceReader = new SequenceReader<byte>(ReadOnlySequence<byte>.Empty);
+                reader.TryReadBulkString(ref sequenceReader, length);
+            });
+        }
+
+
+        /*
+
+
+
 
         [Theory]
         [InlineData("+1\r\n+2\r\n+3\r\n", "1", "2", "3")]
@@ -117,5 +239,6 @@ namespace SlusserLabs.Redis.Resp.Tests
             // Assert.Equal(memory.ToArray(), reader.TokenSequence.First.ToArray());
             // Assert.Equal(expectedBytes.ToArray(), reader.ValueSequence.First.ToArray());
         }
+        */
     }
 }
