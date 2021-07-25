@@ -22,5 +22,25 @@ namespace System.Buffers
         {
             return reader.Sequence.Slice(0, reader.Consumed);
         }
+
+        /// <summary>
+        /// Tries to slice from the current position up to <paramref name="count" /> bytes without advancing the reader.
+        /// </summary>
+        /// <param name="reader">The byte <see cref="SequenceReader{T}" /> instance.</param>
+        /// <param name="span">The slice requested, if the operation succeeded.</param>
+        /// <param name="count">The length of the slice.</param>
+        /// <returns><c>true</c> if a token was read successfully; otherwise, <c>false</c>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool TrySliceTo(this in SequenceReader<byte> reader, out ReadOnlySequence<byte> span, long count)
+        {
+            if (reader.Remaining >= count)
+            {
+                span = reader.Sequence.Slice(0, count);
+                return true;
+            }
+
+            span = default;
+            return false;
+        }
     }
 }

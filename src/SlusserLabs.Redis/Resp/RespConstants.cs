@@ -22,7 +22,7 @@ namespace SlusserLabs.Redis.Resp
         public const byte CarriageReturn = (byte)'\r';
         public const byte LineFeed = (byte)'\n';
 
-        // 512 MBs comes from the documentation https://redis.io/topics/protocol#resp-bulk-strings
+        // 512 MBs comes from the Redis documentation https://redis.io/topics/protocol#resp-bulk-strings
         public const int MaxBulkStringLength = 512 * 1024 * 1024;
 
         public static ReadOnlySpan<byte> CarriageReturnLineFeed => new byte[] { (byte)'\r', (byte)'\n' };

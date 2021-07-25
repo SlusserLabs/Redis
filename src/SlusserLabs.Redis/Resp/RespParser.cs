@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SlusserLabs.Redis.Resp;
 
-namespace SlusserLabs.Redis
+namespace SlusserLabs.Redis.Resp
 {
     /// <summary>
     /// Provides static methods for parsing common RESP byte sequences.

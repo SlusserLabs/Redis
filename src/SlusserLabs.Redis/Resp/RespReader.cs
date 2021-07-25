@@ -71,14 +71,14 @@ namespace SlusserLabs.Redis.Resp
         }
 
         /// <summary>
-        /// Tries to read the next RESP token from the input.
+        /// Tries to read the next RESP token from the sequence.
         /// </summary>
         /// <param name="sequenceReader">The byte sequence to read from.</param>
         /// <returns><c>true</c> if a token was read successfully; otherwise, <c>false</c>.</returns>
         /// <exception cref="RespException">The byte sequence contains invalid RESP data.</exception>
         /// <remarks>
-        /// Unless an exception is thrown, the caller should assume the sequence did not contain enough data to read
-        /// an entire token and should try again by pass a longer sequence of bytes.
+        /// A return value of <c>false</c> indicates there was not enough data in the sequence and the caller should
+        /// append more data and try again.
         /// </remarks>
         public bool TryRead(ref SequenceReader<byte> sequenceReader)
         {
@@ -99,23 +99,109 @@ namespace SlusserLabs.Redis.Resp
                 var firstByte = sequenceReader.CurrentSpan[sequenceReader.CurrentSpanIndex];
                 switch (firstByte)
                 {
+                    case RespConstants.Plus:
+                        return TryReadSimpleString(ref sequenceReader);
                     case RespConstants.Dollar:
                         return TryReadBulkStringLength(ref sequenceReader);
+                    case RespConstants.Minus:
+                        return TryReadError(ref sequenceReader);
                 }
             }
 
             return false;
         }
 
-        private bool TryReadBulkStringLength(ref SequenceReader<byte> reader)
+        /// <summary>
+        /// Tries to read a RESP Bulk String of the specified <paramref name="length" /> from the sequence.
+        /// </summary>
+        /// <param name="sequenceReader">The byte sequence to read from.</param>
+        /// <param name="length">The expected length of the Bulk String.</param>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="length" /> is less than zero.</exception>
+        /// <exception cref="RespException">The byte sequence contains invalid RESP data.</exception>
+        /// <returns><c>true</c> if a token was read successfully; otherwise, <c>false</c>.</returns>
+        /// <remarks>
+        /// <para>
+        /// The <paramref name="length" /> must be obtained from a previous call to <see cref="TryRead" /> which
+        /// yields a <see cref="RespTokenType.RespTokenType" />.
+        /// </para>
+        /// <para>
+        /// A return value of <c>false</c> indicates there was not enough data in the sequence and the caller should
+        /// append more data and try again.
+        /// </para>
+        /// </remarks>
+        public bool TryReadBulkString(ref SequenceReader<byte> sequenceReader, long length)
         {
-            Debug.Assert(reader.CurrentSpan[reader.CurrentSpanIndex] == RespConstants.Dollar);
+            if (length < 0)
+                throw new ArgumentOutOfRangeException(nameof(length), "Bulk String length cannot be negative.");
+            if (!_options.SkipValidation && length > RespConstants.MaxBulkStringLength)
+                throw new ArgumentOutOfRangeException(nameof(length), "Bulk String length cannot exceed 512 MB.");
 
-            if (reader.TryReadTo(out ReadOnlySequence<byte> tokenSequence, RespConstants.CarriageReturnLineFeed))
+            var tokenLength = length + 2;
+            if (sequenceReader.TrySliceTo(out ReadOnlySequence<byte> tokenSeqeunce, tokenLength))
+            {
+                // Ensure terminating <CR><LF>
+                if (!_options.SkipValidation)
+                {
+                    var crPosition = tokenSeqeunce.GetPosition(length);
+                    var lfPosition = tokenSeqeunce.GetPosition(1, crPosition);
+
+                    if (tokenSeqeunce.GetValueAt(crPosition) != RespConstants.CarriageReturn || tokenSeqeunce.GetValueAt(lfPosition) != RespConstants.LineFeed)
+                        throw new RespException("Bulk String was not properly terminated.", length);
+                }
+
+                sequenceReader.Advance(tokenLength);
+
+                _tokenType = RespTokenType.BulkString;
+                _tokenSequence = tokenSeqeunce;
+                _valueSequence = tokenSeqeunce.Slice(0, length);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryReadSimpleString(ref SequenceReader<byte> sequenceReader)
+        {
+            Debug.Assert(sequenceReader.CurrentSpan[sequenceReader.CurrentSpanIndex] == RespConstants.Plus);
+
+            if (sequenceReader.TryReadTo(out ReadOnlySequence<byte> tokenSequence, RespConstants.CarriageReturnLineFeed))
+            {
+                _tokenType = RespTokenType.SimpleString;
+                _tokenSequence = sequenceReader.GetConsumedSequence();
+                _valueSequence = tokenSequence.Slice(1); // Trim '+'
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryReadError(ref SequenceReader<byte> sequenceReader)
+        {
+            Debug.Assert(sequenceReader.CurrentSpan[sequenceReader.CurrentSpanIndex] == RespConstants.Minus);
+
+            if (sequenceReader.TryReadTo(out ReadOnlySequence<byte> tokenSequence, RespConstants.CarriageReturnLineFeed))
+            {
+                _tokenType = RespTokenType.Error;
+                _tokenSequence = sequenceReader.GetConsumedSequence();
+                _valueSequence = tokenSequence.Slice(1); // Trim '-'
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryReadBulkStringLength(ref SequenceReader<byte> sequenceReader)
+        {
+            Debug.Assert(sequenceReader.CurrentSpan[sequenceReader.CurrentSpanIndex] == RespConstants.Dollar);
+
+            if (sequenceReader.TryReadTo(out ReadOnlySequence<byte> tokenSequence, RespConstants.CarriageReturnLineFeed))
             {
                 _tokenType = RespTokenType.BulkStringPrefixedLength;
-                _tokenSequence = reader.GetConsumedSequence();
-                _valueSequence = tokenSequence.Slice(1); // Trim control byte
+                _tokenSequence = sequenceReader.GetConsumedSequence();
+                _valueSequence = tokenSequence.Slice(1); // Trim '$'
 
                 return true;
             }
