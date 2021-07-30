@@ -177,6 +177,28 @@ namespace SlusserLabs.Redis.Resp
             return false;
         }
 
+        private bool TryReadInteger(ref SequenceReader<byte> sequenceReader)
+        {
+            Debug.Assert(sequenceReader.CurrentSpan[sequenceReader.CurrentSpanIndex] == RespConstants.Colon);
+
+            if (sequenceReader.TryReadTo(out ReadOnlySequence<byte> tokenSequence, RespConstants.CarriageReturnLineFeed))
+            {
+                _tokenType = RespTokenType.Integer;
+                _tokenSequence = sequenceReader.GetConsumedSequence();
+                _valueSequence = tokenSequence.Slice(1); // Trim ':'
+
+                return true;
+            }
+
+            if (!_options.SkipValidation && sequenceReader.Remaining > (RespConstants.MinInt64DStringLength + RespConstants.CrLfStringLength))
+            {
+                // We're not going to find a valid integer if we haven't yet; it would overflow
+                throw new RespException("Token exceeded the max possible length of a signed 64-bit integer.", 1);
+            }
+
+            return false;
+        }
+
         private bool TryReadError(ref SequenceReader<byte> sequenceReader)
         {
             Debug.Assert(sequenceReader.CurrentSpan[sequenceReader.CurrentSpanIndex] == RespConstants.Minus);

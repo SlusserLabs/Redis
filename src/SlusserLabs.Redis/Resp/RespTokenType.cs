@@ -30,6 +30,11 @@ namespace SlusserLabs.Redis.Resp
         Error,
 
         /// <summary>
+        /// The token is a RESP signed 64-bit integer.
+        /// </summary>
+        Integer,
+
+        /// <summary>
         /// The token is a RESP Bulk String prefixed length
         /// </summary>
         BulkStringPrefixedLength,
