@@ -21,9 +21,9 @@ namespace SlusserLabs.Redis
         /// <summary>
         /// Initializes a new instance of the <see cref="RedisConnectionFactory" /> class.
         /// </summary>
-        /// <param name="options">The options accessor for accessing <see cref="RedisClientFactoryOptions" />.</param>
-        /// <param name="loggerFactory">A logger factory for logging diagnostic information.</param>
-        public RedisConnectionFactory(IOptions<RedisClientFactoryOptions> options, ILoggerFactory loggerFactory)
+        /// <param name="options">The <see cref="RedisClientFactoryOptions" />.</param>
+        /// <param name="loggerFactory">An <see cref="ILoggerFactory" /> for diagnostic tracing.</param>
+        public RedisConnectionFactory(RedisClientFactoryOptions options, ILoggerFactory loggerFactory)
         {
             if (options == null)
             {
@@ -35,7 +35,7 @@ namespace SlusserLabs.Redis
                 throw new ArgumentNullException(nameof(loggerFactory));
             }
 
-            _options = options.Value;
+            _options = options;
 
             var logger = loggerFactory.CreateLogger("SlusserLabs.Redis.RedisClient");
         }

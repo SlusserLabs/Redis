@@ -23,7 +23,7 @@ namespace SlusserLabs.Redis
 
         public RedisConnection Rent()
         {
-            return default;
+            return new RedisConnection();
         }
 
         public void Return(RedisConnection connection)

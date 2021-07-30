@@ -10,24 +10,39 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace SlusserLabs.Redis
 {
     internal sealed class RedisClientFactory : IRedisClientFactory
     {
+        private readonly IOptionsMonitor<RedisClientFactoryOptions> _optionsMonitor;
         private readonly ConcurrentDictionary<string, Lazy<RedisConnectionPool>> _pools;
         private readonly Func<string, Lazy<RedisConnectionPool>> _poolFactory;
 
-        public RedisClientFactory(IOptionsMonitor<RedisClientFactoryOptions> optionsMonitor)
+        public RedisClientFactory(IOptionsMonitor<RedisClientFactoryOptions> optionsAccessor, ILoggerFactory loggerFactory)
         {
+            if (optionsAccessor == null)
+            {
+                throw new ArgumentNullException(nameof(optionsAccessor));
+            }
+
+            if (loggerFactory == null)
+            {
+                throw new ArgumentNullException(nameof(loggerFactory));
+            }
+
+            _optionsMonitor = optionsAccessor;
+
             // Configuration names are case-insensitive
             _pools = new ConcurrentDictionary<string, Lazy<RedisConnectionPool>>(StringComparer.Ordinal);
             _poolFactory = (name) =>
             {
                 return new Lazy<RedisConnectionPool>(() =>
                 {
-                    return new RedisConnectionPool(default);
+                    var options = _optionsMonitor.Get(name);
+                    return new RedisConnectionPool(new RedisConnectionFactory(options, loggerFactory));
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
             };
         }
@@ -43,19 +58,7 @@ namespace SlusserLabs.Redis
             var connection = pool.Rent();
 
             var client = new RedisClient(connection, disposeConnection: false);
-
-            //if (name == null)
-            //{
-            //    throw new ArgumentNullException(nameof(name));
-            //}
-
-            //ActiveHandlerTrackingEntry entry = _activeHandlers.GetOrAdd(name, _entryFactory).Value;
-
-            //StartHandlerEntryTimer(entry);
-
-            //return entry.Handler;
-
-            return default!;
+            return client;
         }
     }
 }

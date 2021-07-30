@@ -12,7 +12,7 @@ using SlusserLabs.Redis;
 namespace Microsoft.Extensions.DependencyInjection
 {
     /// <summary>
-    /// A builder for configuring named <see cref="RedisClient" /> instance returned by an <see cref="IRedisClientFactory" />.
+    /// A builder for configuring an <see cref="IRedisClientFactory" />.
     /// </summary>
     public interface IRedisClientBuilder
     {

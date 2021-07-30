@@ -41,7 +41,7 @@ namespace SlusserLabs.Redis
         /// <inheritdoc />
         public void Dispose()
         {
-            throw new NotImplementedException();
+            // throw new NotImplementedException();
         }
     }
 }

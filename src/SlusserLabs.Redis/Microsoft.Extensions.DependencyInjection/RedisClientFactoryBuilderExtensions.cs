@@ -14,7 +14,7 @@ namespace Microsoft.Extensions.DependencyInjection
     /// <summary>
     /// Extension methods for configuring an <see cref="IRedisClientBuilder" />.
     /// </summary>
-    public static class RedisClientBuilderExtensions
+    public static class RedisClientFactoryBuilderExtensions
     {
         /// <summary>
         /// Sets the length of time that a <see cref="RedisConnection" /> instance can be reused. Each named
