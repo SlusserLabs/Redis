@@ -13,7 +13,7 @@ namespace SlusserLabs.Redis.Resp
     /// <summary>
     /// Defines an exception when invalid RESP data is encountered.
     /// </summary>
-    // [Serializable]
+    [Serializable]
     public class RespException : Exception
     {
         /// <summary>
@@ -60,7 +60,7 @@ namespace SlusserLabs.Redis.Resp
         /// </exception>
         protected RespException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            BytePosition = (long?)info.GetValue("BytePosition", typeof(long?));
+            BytePosition = (long?)info.GetValue(nameof(BytePosition), typeof(long?));
         }
 
         /// <summary>
