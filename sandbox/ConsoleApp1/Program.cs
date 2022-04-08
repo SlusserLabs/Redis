@@ -4,6 +4,7 @@
 using System;
 using System.Buffers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,7 +15,7 @@ namespace ConsoleApp1
 {
     class Program
     {
-        static Task Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine("Hello World!");
 
@@ -25,18 +26,20 @@ namespace ConsoleApp1
             using var scope = host.Services.CreateScope();
             var provider = scope.ServiceProvider;
 
-            using var client = provider.GetRequiredService<RedisClient>();
+            var pool = provider.GetRequiredService<IRedisConnectionPool>();
+            using var connection = await pool.RentAsync(CancellationToken.None);
+            await connection.HSetAsync("my-key", "field1", "value1");
 
-            return host.RunAsync();
+            await host.RunAsync();
         }
 
         private static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.AddRedisClient(options =>
+                    services.AddRedisConnectionPool(options =>
                     {
-                        options.Configuration = "localhost";
+                        options.ConnectionString = "localhost";
                     });
                 });
     }

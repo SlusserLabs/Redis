@@ -3,17 +3,37 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO.Pipelines;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
-using Microsoft.AspNetCore.Connections.Features;
-using Microsoft.AspNetCore.Http.Features;
+
 
 namespace SlusserLabs.Redis
 {
-    public class RedisConnection : DefaultConnectionContext
+    internal sealed class RedisConnection : IRedisConnection, IDisposable
     {
+        private Socket _socket;
+
+        internal RedisConnection()
+        {
+
+        }
+
+        public void Dispose()
+        {
+            throw new NotImplementedException();
+        }
+
+        //public Task HelloAsync()
+        //{
+
+        //}
+
+        //private Task ConnectAsync(CancellationToken cancellationToken)
+        //{
+
+        //}
     }
 }

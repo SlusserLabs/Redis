@@ -186,7 +186,7 @@ namespace SlusserLabs.Redis.Resp
         }
 
         /// <summary>
-        /// Writes a Simple String, "+&lt;<paramref name="value"/>&gt;\r\n".
+        /// Writes a Simple String, "+&lt;<paramref name="value" />&gt;\r\n".
         /// </summary>
         /// <param name="value">The string of byte data to write.</param>
         /// <exception cref="InvalidOperationException">The result would be invalid RESP (while validation is enabled).</exception>

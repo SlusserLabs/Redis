@@ -6,18 +6,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
 
 namespace SlusserLabs.Redis
 {
     /// <summary>
-    /// Options for configuring a <see cref="RedisClient" />.
+    /// Extension methods for common Redis commands.
     /// </summary>
-    public class RedisClientOptions
+    public static class RedisConnectionExtensions
     {
-        /// <summary>
-        /// Gets or sets the connection string used to connect to a Redis server.
-        /// </summary>
-        public string? Configuration { get; set; }
+        public static Task HSetAsync(this IRedisConnection connection, string key, string field, string value)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
