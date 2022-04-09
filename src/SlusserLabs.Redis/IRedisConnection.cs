@@ -11,5 +11,6 @@ namespace SlusserLabs.Redis
 {
     public interface IRedisConnection : IDisposable
     {
+        Task TestAsync();
     }
 }

@@ -64,9 +64,9 @@ namespace SlusserLabs.Redis
         private RedisConnectionPoolImpl CreateImpl(string name)
         {
             var options = _options.Get(name);
-            if (string.IsNullOrEmpty(options.ConnectionString))
+            if (options.EndPoint == null)
             {
-                // Our Options validation logic ensures we always have a Redis connection string, so this
+                // Our Options validation logic ensures we always have a Redis endpoint, so this
                 // can only happen when the user has requested a named configuration that doesn't exist....
                 throw new InvalidOperationException(
                     $"A Redis connection pool does not exist for the configuration name '{name}'. " +
@@ -82,12 +82,13 @@ namespace SlusserLabs.Redis
         {
             private readonly SemaphoreSlim _semaphore;
             private readonly ConcurrentQueue<RedisConnection> _idleConnections;
-            // private readonly RedisConnectionPoolOptions _options;
+            private readonly RedisConnectionPoolOptions _options;
 
             public RedisConnectionPoolImpl(RedisConnectionPoolOptions options)
             {
                 Debug.Assert(options != null && !string.IsNullOrEmpty(options.ConnectionString));
 
+                _options = options;
                 _semaphore = new SemaphoreSlim((int)options.MaxPoolSize!, (int)options.MaxPoolSize!);
                 _idleConnections = new ConcurrentQueue<RedisConnection>();
             }
@@ -124,7 +125,7 @@ namespace SlusserLabs.Redis
                     return connection;
                 }
 
-                return new RedisConnection();
+                return new RedisConnection(_options);
             }
         }
     }
