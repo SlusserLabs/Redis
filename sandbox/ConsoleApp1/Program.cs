@@ -28,7 +28,7 @@ namespace ConsoleApp1
 
             var pool = provider.GetRequiredService<IRedisConnectionPool>();
             using var connection = await pool.RentAsync(CancellationToken.None);
-            await connection.TestAsync();
+            await connection.TestAsync(CancellationToken.None);
 
             await host.RunAsync();
         }
@@ -39,7 +39,7 @@ namespace ConsoleApp1
                 {
                     services.AddRedisConnectionPool(options =>
                     {
-                        options.ConnectionString = "localhost:6379";
+                        options.ConnectionString = "127.0.0.1:6379";
                     });
                 });
     }

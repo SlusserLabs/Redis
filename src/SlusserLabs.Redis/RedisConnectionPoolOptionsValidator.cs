@@ -88,8 +88,10 @@ namespace SlusserLabs.Redis
                                 return false;
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        Debug.WriteLine(ex);
+
                         failureMessage = $"The endpoint specified in the '{nameof(RedisConnectionPoolOptions.ConnectionString)}' could not be parsed.";
                         return false;
                     }
@@ -105,8 +107,10 @@ namespace SlusserLabs.Redis
                             options.MaxPoolSize ??= maxPoolSize;
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        Debug.WriteLine(ex);
+
                         failureMessage = $"The '{name}' value specified in the '{nameof(RedisConnectionPoolOptions.ConnectionString)}' could not be parsed.";
                         return false;
                     }

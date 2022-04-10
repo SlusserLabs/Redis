@@ -16,4 +16,8 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SlusserLabs.Redis.Abstractions\SlusserLabs.Redis.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>
