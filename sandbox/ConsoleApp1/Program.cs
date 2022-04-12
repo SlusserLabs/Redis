@@ -4,27 +4,43 @@
 using System;
 using System.Buffers;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using SlusserLabs.Redis;
 using SlusserLabs.Redis.Resp;
 
 namespace ConsoleApp1
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine("Hello World!");
 
-            var reader = new RespReader();
-            var input = Encoding.ASCII.GetBytes("$-1\r\n");
-            var sequenceReader = new SequenceReader<byte>(new ReadOnlySequence<byte>(input));
+            var host = CreateHostBuilder(args)
+                .UseConsoleLifetime()
+                .Build();
 
-            if (sequenceReader.TryReadTo(out ReadOnlySequence<byte> tokenSequence, new byte[] { (byte)'\r', (byte)'\n' }))
-            {
-                Console.WriteLine("Found <CR><LF>");
-                return;
-            }
+            using var scope = host.Services.CreateScope();
+            var provider = scope.ServiceProvider;
 
-            Console.WriteLine("Did not find <CR><LF>");
+            var pool = provider.GetRequiredService<IRedisConnectionPool>();
+            using var connection = await pool.RentAsync(CancellationToken.None);
+            await connection.TestAsync(CancellationToken.None);
+
+            await host.RunAsync();
         }
+
+        private static IHostBuilder CreateHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddRedisConnectionPool(options =>
+                    {
+                        options.ConnectionString = "127.0.0.1:6379";
+                    });
+                });
     }
 }

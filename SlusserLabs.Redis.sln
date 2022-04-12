@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31424.327
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32126.317
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{109966AE-4E14-4092-9B3B-E14E9229D1B3}"
 EndProject
@@ -24,7 +24,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sandbox", "sandbox", "{0B1CE6DA-6549-43F5-B0CD-3F27C07EB61C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "sandbox\ConsoleApp1\ConsoleApp1.csproj", "{464F7CEF-DAB1-415D-BB60-6F564BA23095}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleApp1", "sandbox\ConsoleApp1\ConsoleApp1.csproj", "{464F7CEF-DAB1-415D-BB60-6F564BA23095}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SlusserLabs.Redis.Abstractions", "src\SlusserLabs.Redis.Abstractions\SlusserLabs.Redis.Abstractions.csproj", "{CB57642D-6F44-4618-864A-57B2C898C3EA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -44,6 +46,10 @@ Global
 		{464F7CEF-DAB1-415D-BB60-6F564BA23095}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{464F7CEF-DAB1-415D-BB60-6F564BA23095}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{464F7CEF-DAB1-415D-BB60-6F564BA23095}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CB57642D-6F44-4618-864A-57B2C898C3EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CB57642D-6F44-4618-864A-57B2C898C3EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CB57642D-6F44-4618-864A-57B2C898C3EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CB57642D-6F44-4618-864A-57B2C898C3EA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -52,6 +58,7 @@ Global
 		{DC49DCF5-519F-42F3-A2C3-6E137CEAF3E0} = {109966AE-4E14-4092-9B3B-E14E9229D1B3}
 		{A3BAFF61-DD28-4875-B1BA-AB653EFC37CA} = {901CF2FD-A2F1-4D10-A47B-3E16C2C2748B}
 		{464F7CEF-DAB1-415D-BB60-6F564BA23095} = {0B1CE6DA-6549-43F5-B0CD-3F27C07EB61C}
+		{CB57642D-6F44-4618-864A-57B2C898C3EA} = {109966AE-4E14-4092-9B3B-E14E9229D1B3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {862F56F1-D43B-4A38-BA2D-17E52C6F8CD6}

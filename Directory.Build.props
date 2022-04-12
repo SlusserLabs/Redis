@@ -6,7 +6,7 @@
     <IncludeSource>true</IncludeSource>
   </PropertyGroup>
   <PropertyGroup>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Product>SlusserLabs.Redis</Product>
     <Company>SlusserLabs</Company>
     <Copyright>Copyright (c) $([System.DateTime]::Now.ToString("yyyy")) SlusserLabs, Jacob Slusser. All rights reserved.</Copyright>
@@ -22,8 +22,8 @@
     <NoWarn>CS1591;SA1600</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="5.0.3" PrivateAssets="all" />
-    <PackageReference Include="StyleCop.Analyzers" Version="1.1.118" PrivateAssets="all" />
+    <!--<PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="5.0.3" PrivateAssets="all" />
+    <PackageReference Include="StyleCop.Analyzers" Version="1.1.118" PrivateAssets="all" />-->
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" Visible="false" />
