@@ -1,6 +1,7 @@
 ﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using SlusserLabs.Redis.Resp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -26,7 +27,8 @@ namespace SlusserLabs.Redis
         private Task? _receivingTask;
 
         private List<ArraySegment<byte>>? _sendBuffers;
-        private PipeReader? _sendPipe;
+        private Pipe? _sendPipe;
+        private Pipe? _receivePipe;
 
         internal RedisConnection(RedisConnectionPoolOptions options)
         {
@@ -57,6 +59,20 @@ namespace SlusserLabs.Redis
                 {
                     await HelloAsync(cancellationToken);
                 }
+
+                // Send the PING command
+                var writer = _sendPipe!.Writer;
+                var respWriter = new RespWriter(writer);
+                respWriter.WriteArrayStart(1);
+                respWriter.WriteBulkString(Encoding.ASCII.GetBytes("PING"));
+                respWriter.Flush();
+                await _sendPipe.Writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+                // Receive the PONG response
+                var reader = _receivePipe!.Reader;
+                var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                var buffer = result.Buffer;
+                Console.WriteLine(Encoding.UTF8.GetString(buffer));
             }
             catch (Exception ex)
             {
@@ -100,12 +116,14 @@ namespace SlusserLabs.Redis
 
         private async Task DoSend()
         {
+            var reader = _sendPipe!.Reader;
+
             try
             {
                 while (true)
                 {
                     // Get data from the send buffer
-                    var result = await _sendPipe!.ReadAsync().ConfigureAwait(false);
+                    var result = await reader.ReadAsync().ConfigureAwait(false);
                     if (result.IsCanceled)
                     {
                         break;
@@ -135,7 +153,7 @@ namespace SlusserLabs.Redis
                             _sendBuffers.Clear();
                         }
 
-                        _sendPipe.AdvanceTo(buffers.GetPosition(bytesSent));
+                        reader.AdvanceTo(buffers.GetPosition(bytesSent));
                         if (result.IsCompleted)
                         {
                             break;
@@ -157,6 +175,36 @@ namespace SlusserLabs.Redis
 
         private async Task DoReceive()
         {
+            try
+            {
+                while(true)
+                {
+                    var buffer = _receivePipe!.Writer.GetMemory(4096);
+                    var bytesReceived = await _socket!.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None).ConfigureAwait(false);
+                    if (bytesReceived == 0)
+                    {
+                        break;
+                    }
+
+                    _receivePipe.Writer.Advance(bytesReceived);
+                    var result = await _receivePipe.Writer.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+
+                    if(result.IsCompleted || result.IsCanceled)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+
+                throw;
+            }
+            finally
+            {
+
+            }
         }
 
         private async ValueTask HelloAsync(CancellationToken cancellationToken)
@@ -177,11 +225,12 @@ namespace SlusserLabs.Redis
 
             // TODO TLS
 
+            _sendPipe = new Pipe();
+            _receivePipe = new Pipe();
+
             // Start the pump
             _sendingTask = DoSend();
             _receivingTask = DoReceive();
-
-
         }
     }
 }
