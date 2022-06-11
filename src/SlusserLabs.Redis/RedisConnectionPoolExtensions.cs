@@ -7,11 +7,10 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Options = Microsoft.Extensions.Options.Options;
 
 namespace SlusserLabs.Redis
 {
-    using Options = Microsoft.Extensions.Options.Options;
-
     /// <summary>
     /// Extension methods for <see cref="IRedisConnectionPool" /> instances.
     /// </summary>

@@ -1,8 +1,6 @@
 ﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,6 +10,8 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace SlusserLabs.Redis
 {
@@ -74,7 +74,7 @@ namespace SlusserLabs.Redis
             }
 
             options.Immutable = true; // Freeze the options
-            var impl = new RedisConnectionPoolImpl(options);
+            var impl = new RedisConnectionPoolImpl(name, options);
 
             return impl;
         }
@@ -83,12 +83,16 @@ namespace SlusserLabs.Redis
         {
             private readonly SemaphoreSlim _semaphore;
             private readonly ConcurrentQueue<RedisConnection> _idleConnections;
+
+            private readonly string _name;
             private readonly RedisConnectionPoolOptions _options;
 
-            public RedisConnectionPoolImpl(RedisConnectionPoolOptions options)
+            public RedisConnectionPoolImpl(string name, RedisConnectionPoolOptions options)
             {
+                Debug.Assert(name != null);
                 Debug.Assert(options != null && !string.IsNullOrEmpty(options.ConnectionString));
 
+                _name = name;
                 _options = options;
                 _semaphore = new SemaphoreSlim((int)options.MaxPoolSize!, (int)options.MaxPoolSize!);
                 _idleConnections = new ConcurrentQueue<RedisConnection>();
@@ -97,8 +101,9 @@ namespace SlusserLabs.Redis
             public ValueTask<IRedisConnection> RentAsync(TimeSpan timeout, CancellationToken cancellationToken)
             {
                 var waitTask = _semaphore.WaitAsync(timeout, cancellationToken);
-                if (waitTask.IsCompletedSuccessfully && waitTask.Result) // Lease acquired
+                if (waitTask.IsCompletedSuccessfully && waitTask.Result)
                 {
+                    // Lease acquired; process synchronously
                     var connection = GetOrCreateIdleConnection();
                     return new ValueTask<IRedisConnection>(connection);
                 }

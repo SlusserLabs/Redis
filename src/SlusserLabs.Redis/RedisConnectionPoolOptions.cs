@@ -1,7 +1,6 @@
 ﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using SlusserLabs.Redis.Resp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +8,7 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using SlusserLabs.Redis.Resp;
 
 namespace SlusserLabs.Redis
 {
@@ -65,6 +65,12 @@ namespace SlusserLabs.Redis
         public int? MaxPoolSize { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether to wait until there is data to receive before allocating a buffer.
+        /// </summary>
+        /// <remarks>Setting this to <c>false</c> can increase throughput at the expense of increased memory usage.</remarks>
+        public bool AllocateReceiveBufferOnDemand { get; set; } = true;
+
+        /// <summary>
         /// Gets or sets whether to enable Nagle's algorithm for all connections.
         /// The default is <c>true</c>.
         /// </summary>
@@ -78,7 +84,6 @@ namespace SlusserLabs.Redis
         {
             if (RespVersion != RespVersion.Unknown)
             {
-
             }
         }
     }

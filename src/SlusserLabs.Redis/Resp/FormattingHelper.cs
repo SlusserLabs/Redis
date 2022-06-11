@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
+
 namespace SlusserLabs.Redis.Resp
 {
     internal static class FormattingHelper

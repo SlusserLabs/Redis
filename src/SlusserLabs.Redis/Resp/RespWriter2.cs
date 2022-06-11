@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,6 +9,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using SlusserLabs.Redis.Helpers;
 
 namespace SlusserLabs.Redis.Resp
 {
@@ -146,7 +150,7 @@ namespace SlusserLabs.Redis.Resp
 
             var output = _memory.Span;
             output[_bytesPending++] = RespConstants.Dollar;
-            output[_bytesPending++] = (byte)('1');
+            output[_bytesPending++] = (byte)'1';
             output[_bytesPending++] = RespConstants.CarriageReturn;
             output[_bytesPending++] = RespConstants.LineFeed;
             output[_bytesPending++] = value;

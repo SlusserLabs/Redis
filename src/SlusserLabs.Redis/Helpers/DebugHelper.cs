@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -6,11 +9,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SlusserLabs.Redis.Resp
+namespace SlusserLabs.Redis.Helpers
 {
     internal static class DebugHelper
     {
-        public static void DumpMemoryToOutput(Memory<byte> memory, int offset)
+        public static void DumpMemoryToOutput(ReadOnlyMemory<byte> memory, int offset)
         {
             var builder = new StringBuilder();
             var charBuilder = new StringBuilder();
@@ -41,6 +44,7 @@ namespace SlusserLabs.Redis.Resp
                     {
                         builder.AppendLine();
                     }
+
                     charBuilder.Clear();
                 }
                 else if ((i + 1) % 8 == 0)

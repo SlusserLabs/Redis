@@ -1,8 +1,6 @@
 ﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,6 +9,8 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 
 namespace SlusserLabs.Redis
 {

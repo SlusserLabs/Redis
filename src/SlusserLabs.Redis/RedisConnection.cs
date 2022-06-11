@@ -1,7 +1,6 @@
 ﻿// Copyright (c) SlusserLabs, Jacob Slusser. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using SlusserLabs.Redis.Resp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,12 +11,15 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
+using SlusserLabs.Redis.Helpers;
+using SlusserLabs.Redis.Resp;
 
 namespace SlusserLabs.Redis
 {
     internal sealed class RedisConnection : IRedisConnection, IDisposable
     {
+        private const int _minBlockSize = 4096; // Chosen because most operating systems use 4k pages
+
         private readonly string _connectionId;
         private readonly RedisConnectionPoolOptions _options;
 
@@ -89,33 +91,31 @@ namespace SlusserLabs.Redis
 
         internal void Reset()
         {
-            //if (keepAlive)
-            //{
-            //    Debug.Assert(_status == RedisConnectionStatus.New || _status == RedisConnectionStatus.Ready);
+            // if (keepAlive)
+            // {
+            //     Debug.Assert(_status == RedisConnectionStatus.New || _status == RedisConnectionStatus.Ready);
 
+            // return;
+            // }
 
-            //    return;
-            //}
+            // // Full reset, don't reuse the socket
+            // _socket?.Dispose();
+            // _socket = null;
+            // _status = RedisConnectionStatus.New;
 
+            // if(_socket != null)
+            // {
 
-            //// Full reset, don't reuse the socket
-            //_socket?.Dispose();
-            //_socket = null;
-            //_status = RedisConnectionStatus.New;
+            // }
 
-            //if(_socket != null)
-            //{
+            // if (_socket != null && !keepAlive)
+            // {
+            //     _
 
-            //}
+            // return;
+            // }
 
-            //if (_socket != null && !keepAlive)
-            //{
-            //    _
-
-            //    return;
-            //}
-
-            //_status = RedisConnectionStatus.Ready;
+            // _status = RedisConnectionStatus.Ready;
         }
 
         private async Task DoSend()
@@ -173,7 +173,6 @@ namespace SlusserLabs.Redis
             }
             finally
             {
-
             }
         }
 
@@ -181,20 +180,29 @@ namespace SlusserLabs.Redis
         {
             try
             {
-                while(true)
+                while (true)
                 {
-                    var buffer = _receivePipe!.Writer.GetMemory(4096);
+                    if (_options.AllocateReceiveBufferOnDemand)
+                    {
+                        // Wait for data with an empty buffer
+                        await _socket!.ReceiveAsync(Memory<byte>.Empty, SocketFlags.None, CancellationToken.None).ConfigureAwait(false);
+                    }
+
+                    // Receive data
+                    var pipeWriter = _receivePipe!.Writer;
+                    var buffer = pipeWriter.GetMemory(_minBlockSize);
                     var bytesReceived = await _socket!.ReceiveAsync(buffer, SocketFlags.None, CancellationToken.None).ConfigureAwait(false);
                     if (bytesReceived == 0)
                     {
                         break;
                     }
 
-                    _receivePipe.Writer.Advance(bytesReceived);
-                    var result = await _receivePipe.Writer.FlushAsync(CancellationToken.None).ConfigureAwait(false);
-
-                    if(result.IsCompleted || result.IsCanceled)
+                    // Make the data available to pipe readers
+                    pipeWriter.Advance(bytesReceived);
+                    var result = await pipeWriter.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+                    if (result.IsCompleted || result.IsCanceled)
                     {
+                        // Reader has shut down; stop writing
                         break;
                     }
                 }
@@ -207,7 +215,6 @@ namespace SlusserLabs.Redis
             }
             finally
             {
-
             }
         }
 
@@ -215,14 +222,14 @@ namespace SlusserLabs.Redis
         {
             await ConnectAsync(cancellationToken);
 
-            //WriteHello(_sendPipe!.Writer, _options);
-            //await _sendPipe.Writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+            WriteHello(_sendPipe!.Writer, _options);
+            await _sendPipe.Writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-            //// Receive the response
-            //var reader = _receivePipe!.Reader;
-            //var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-            //var buffer = result.Buffer;
-            //Console.WriteLine(Encoding.UTF8.GetString(buffer));
+            // Receive the response
+            var reader = _receivePipe!.Reader;
+            var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            var buffer = result.Buffer;
+            Console.WriteLine(Encoding.UTF8.GetString(buffer));
 
             static void WriteHello(PipeWriter writer, RedisConnectionPoolOptions options)
             {
@@ -235,7 +242,7 @@ namespace SlusserLabs.Redis
                 if (options.RespVersion == RespVersion.Unknown)
                 {
                     // Do a simple HELLO and look for possible error response indicating
-                    respWriter.WriteArrayStart(7);
+                    respWriter.WriteArrayStart(2);
                     respWriter.WriteRaw(RespConstants.HelloBulkString);
                     respWriter.WriteBulkString((byte)'3');
                 }
