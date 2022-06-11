@@ -38,7 +38,6 @@ namespace SlusserLabs.Redis
             return ValidateOptionsResult.Success;
         }
 
-
         private static bool TryParseConnectionString(RedisConnectionPoolOptions options, out string? failureMessage)
         {
             // NOTE: We favor maintainability and simplicity here because this is not
@@ -103,8 +102,16 @@ namespace SlusserLabs.Redis
                         // Set option properties that aren't already set
                         if (string.Equals(name, nameof(options.MaxPoolSize), StringComparison.OrdinalIgnoreCase))
                         {
-                            var maxPoolSize = int.Parse(value);
+                            var maxPoolSize = int.Parse(value); // Exceptions will be caught
                             options.MaxPoolSize ??= maxPoolSize;
+                        }
+                        else if (string.Equals(name, nameof(options.Password), StringComparison.OrdinalIgnoreCase))
+                        {
+                            options.Password ??= value;
+                        }
+                        else if (string.Equals(name, "user", StringComparison.OrdinalIgnoreCase) || string.Equals(name, nameof(options.Username), StringComparison.OrdinalIgnoreCase))
+                        {
+                            options.Username ??= value;
                         }
                     }
                     catch (Exception ex)
@@ -145,6 +152,7 @@ namespace SlusserLabs.Redis
         {
             // Set defaults for option properties not already set
             options.MaxPoolSize ??= RedisConnectionPoolOptions.DefaultMaxPoolSize;
+            options.Username ??= RedisConnectionPoolOptions.DefaultUsername;
         }
     }
 }

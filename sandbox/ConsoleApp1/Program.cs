@@ -19,6 +19,9 @@ namespace ConsoleApp1
         {
             Console.WriteLine("Hello World!");
 
+            // var n = new ArrayBufferWriter<byte>();
+            // var m = n.GetMemory(512 * 1024 * 1024);
+
             var host = CreateHostBuilder(args)
                 .UseConsoleLifetime()
                 .Build();

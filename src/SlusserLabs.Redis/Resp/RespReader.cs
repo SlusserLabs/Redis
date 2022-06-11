@@ -190,7 +190,7 @@ namespace SlusserLabs.Redis.Resp
                 return true;
             }
 
-            if (!_options.SkipValidation && sequenceReader.Remaining > (RespConstants.MinInt64DStringLength + RespConstants.CrLfStringLength))
+            if (!_options.SkipValidation && sequenceReader.Remaining > (RespConstants.MinInt64DStringLength + RespConstants.CarriageReturnLineFeed.Length))
             {
                 // We're not going to find a valid integer if we haven't yet; it would overflow
                 throw new RespException("Token exceeded the max possible length of a signed 64-bit integer.", 1);

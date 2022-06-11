@@ -35,8 +35,87 @@ namespace SlusserLabs.Redis.Resp
         public static readonly int MinInt64DStringLength = MinIn64DString.Length;
 
         public static ReadOnlySpan<byte> CarriageReturnLineFeed => new byte[] { (byte)'\r', (byte)'\n' };
-        public const int CrLfStringLength = 2;
 
-        public static ReadOnlySpan<byte> NullBulkString => new byte[] { (byte)'$', (byte)'-', (byte)'1', (byte)'\r', (byte)'\n' };
+        public static ReadOnlySpan<byte> NullArray => new byte[]
+        {
+            (byte)'*',
+            (byte)'-',
+            (byte)'1',
+            (byte)'\r',
+            (byte)'\n'
+        };
+
+        public static ReadOnlySpan<byte> EmptyArray => new byte[]
+        {
+            (byte)'*',
+            (byte)'0',
+            (byte)'\r',
+            (byte)'\n'
+        };
+
+        public static ReadOnlySpan<byte> NullBulkString => new byte[]
+        {
+            (byte)'$',
+            (byte)'-',
+            (byte)'1',
+            (byte)'\r',
+            (byte)'\n'
+        };
+
+        public static ReadOnlySpan<byte> EmptyBulkString => new byte[]
+        {
+            (byte)'$',
+            (byte)'0',
+            (byte)'\r',
+            (byte)'\n',
+            (byte)'\r',
+            (byte)'\n'
+        };
+
+        public static ReadOnlySpan<byte> HelloBulkString => new byte[]
+        {
+            (byte)'$',
+            (byte)'5',
+            (byte)'\r',
+            (byte)'\n',
+            (byte)'H',
+            (byte)'E',
+            (byte)'L',
+            (byte)'L',
+            (byte)'O',
+            (byte)'\r',
+            (byte)'\n'
+        };
+
+        public static ReadOnlySpan<byte> AuthBulkString => new byte[]
+        {
+            (byte)'$',
+            (byte)'4',
+            (byte)'\r',
+            (byte)'\n',
+            (byte)'A',
+            (byte)'U',
+            (byte)'T',
+            (byte)'H',
+            (byte)'\r',
+            (byte)'\n'
+        };
+
+        public static ReadOnlySpan<byte> SetNameBulkString => new byte[]
+        {
+            (byte)'$',
+            (byte)'7',
+            (byte)'\r',
+            (byte)'\n',
+            (byte)'S',
+            (byte)'E',
+            (byte)'T',
+            (byte)'N',
+            (byte)'A',
+            (byte)'M',
+            (byte)'E',
+            (byte)'\r',
+            (byte)'\n'
+        };
     }
 }

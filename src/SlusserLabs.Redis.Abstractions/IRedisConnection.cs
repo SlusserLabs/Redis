@@ -22,6 +22,11 @@ namespace SlusserLabs.Redis
     public interface IRedisConnection : IDisposable
     {
         /// <summary>
+        /// Gets a unique identifier to represent this connection in trace logs.
+        /// </summary>
+        public string ConnectionId { get; }
+
+        /// <summary>
         /// Gets the status of this connection.
         /// </summary>
         RedisConnectionStatus Status { get; }

@@ -156,7 +156,7 @@ namespace SlusserLabs.Redis.Resp
             }
 
             // Dollar, value length, CarriageReturn, LineFeed, value, CarriageReturn, LineFeed
-            var lengthDigits = value.Length < 10 ? 1 : FormattingHelper.CountDigits((uint)value.Length);
+            var lengthDigits = value.Length < 10 ? 1 : FormattingHelper.CountDecimalDigits((uint)value.Length);
             var sizeRequired = 5 + lengthDigits + value.Length;
             if (_memory.Length - _bytesPending < sizeRequired)
                 Grow(sizeRequired);
@@ -184,6 +184,7 @@ namespace SlusserLabs.Redis.Resp
             output[_bytesPending++] = RespConstants.CarriageReturn;
             output[_bytesPending++] = RespConstants.LineFeed;
         }
+
 
         /// <summary>
         /// Writes a Simple String, "+&lt;<paramref name="value" />&gt;\r\n".
@@ -265,7 +266,7 @@ namespace SlusserLabs.Redis.Resp
             // TODO Count array writes before allowing next array
 
             // Asterisk, length, Carriage Return, LineFeed
-            var lengthDigits = length < 10 ? 1 : FormattingHelper.CountDigits((uint)length);
+            var lengthDigits = length < 10 ? 1 : FormattingHelper.CountDecimalDigits((uint)length);
             var sizeRequired = 3 + lengthDigits;
             if (_memory.Length - _bytesPending < sizeRequired)
                 Grow(sizeRequired);

@@ -69,8 +69,9 @@ namespace SlusserLabs.Redis.Resp
             return digits;
         }
 
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int CountDigits(uint value)
+        public static int CountDecimalDigits(long value)
         {
             int digits = 1;
             if (value >= 100000)
@@ -105,6 +106,26 @@ namespace SlusserLabs.Redis.Resp
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteDigits(long value, int length, Span<byte> buffer)
+        {
+            // https://github.com/dotnet/runtime/blob/v5.0.8/src/libraries/System.Private.CoreLib/src/System/Buffers/Text/Utf8Formatter/FormattingHelpers.cs
+
+            Debug.Assert(value >= 0);
+            Debug.Assert(length > 0);
+            Debug.Assert(buffer.Length >= length);
+
+            for (int i = length - 1; i >= 1; i--)
+            {
+                long temp = '0' + value;
+                value /= 10;
+                buffer[i] = (byte)(temp - (value * 10));
+            }
+
+            Debug.Assert(value < 10);
+            buffer[0] = (byte)('0' + value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteDigits(ulong value, Span<byte> buffer)
         {
             // We can mutate the 'value' parameter since it's a copy-by-value local.
@@ -124,7 +145,7 @@ namespace SlusserLabs.Redis.Resp
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteDigits(uint value, Span<byte> buffer)
         {
-            Debug.Assert(buffer.Length >= CountDigits(value));
+            Debug.Assert(buffer.Length >= CountDecimalDigits(value));
 
             // We can mutate the 'value' parameter since it's a copy-by-value local.
             // It'll be used to represent the value left over after each division by 10.

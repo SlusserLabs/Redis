@@ -31,7 +31,7 @@ namespace SlusserLabs.Redis
                 throw new ArgumentNullException(nameof(services));
             }
 
-            if(options == null)
+            if (options == null)
             {
                 throw new ArgumentNullException(nameof(options));
             }
@@ -73,6 +73,7 @@ namespace SlusserLabs.Redis
                     $"Are you missing a call to {nameof(RedisConnectionPoolServiceCollectionExtensions.AddRedisConnectionPool)} for this named configuration?");
             }
 
+            options.Immutable = true; // Freeze the options
             var impl = new RedisConnectionPoolImpl(options);
 
             return impl;
@@ -125,7 +126,7 @@ namespace SlusserLabs.Redis
                     return connection;
                 }
 
-                return new RedisConnection(_options);
+                return new RedisConnection(Guid.NewGuid().ToString(), _options);
             }
         }
     }

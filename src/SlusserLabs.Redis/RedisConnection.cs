@@ -18,6 +18,7 @@ namespace SlusserLabs.Redis
 {
     internal sealed class RedisConnection : IRedisConnection, IDisposable
     {
+        private readonly string _connectionId;
         private readonly RedisConnectionPoolOptions _options;
 
         private RedisConnectionStatus _status;
@@ -30,13 +31,16 @@ namespace SlusserLabs.Redis
         private Pipe? _sendPipe;
         private Pipe? _receivePipe;
 
-        internal RedisConnection(RedisConnectionPoolOptions options)
+        internal RedisConnection(string connectionId, RedisConnectionPoolOptions options)
         {
+            Debug.Assert(!string.IsNullOrEmpty(connectionId));
             Debug.Assert(options != null && options.EndPoint != null);
 
+            _connectionId = connectionId;
             _options = options;
         }
 
+        public string ConnectionId => _connectionId;
         public RedisConnectionStatus Status => _status;
         public EndPoint? LocalEndPoint => _socket?.LocalEndPoint;
         public EndPoint? RemoteEndPoint => _socket?.RemoteEndPoint;
@@ -208,6 +212,39 @@ namespace SlusserLabs.Redis
         }
 
         private async ValueTask HelloAsync(CancellationToken cancellationToken)
+        {
+            await ConnectAsync(cancellationToken);
+
+            //WriteHello(_sendPipe!.Writer, _options);
+            //await _sendPipe.Writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+            //// Receive the response
+            //var reader = _receivePipe!.Reader;
+            //var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            //var buffer = result.Buffer;
+            //Console.WriteLine(Encoding.UTF8.GetString(buffer));
+
+            static void WriteHello(PipeWriter writer, RedisConnectionPoolOptions options)
+            {
+                // The HELLO command and RESP v3 handshake
+                var respWriter = new RespWriter2(writer, new RespWriterOptions
+                {
+                    SkipValidation = true
+                });
+
+                if (options.RespVersion == RespVersion.Unknown)
+                {
+                    // Do a simple HELLO and look for possible error response indicating
+                    respWriter.WriteArrayStart(7);
+                    respWriter.WriteRaw(RespConstants.HelloBulkString);
+                    respWriter.WriteBulkString((byte)'3');
+                }
+
+                respWriter.Flush();
+            }
+        }
+
+        private async ValueTask ConnectAsync(CancellationToken cancellationToken)
         {
             Debug.Assert(_status == RedisConnectionStatus.New);
             Debug.Assert(_socket == null);
